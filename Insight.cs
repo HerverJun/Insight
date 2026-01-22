@@ -104,6 +104,17 @@ namespace Insight
 
         private string GetEmbeddedResource(string fileName)
         {
+#if DEBUG
+            // Debug 模式下，优先从源代码目录加载，方便热更 UI
+            // 假设 BaseDirectory 是 bin\Debug\net8.0-windows\
+            // 向上 3 层找到项目根目录 c:\Users\...\InsightV2\
+            var debugPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", fileName));
+            if (File.Exists(debugPath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[Debug] Loading UI from source: {debugPath}");
+                return File.ReadAllText(debugPath);
+            }
+#endif
             var assembly = Assembly.GetExecutingAssembly();
             var resourceName = $"Insight.{fileName}"; // 嵌入资源名称格式: 命名空间.文件名
 
@@ -115,7 +126,7 @@ namespace Insight
             }
             else
             {
-                // 开发环境回退：从磁盘加载文件
+                // 发布环境或者资源未找到：尝试从运行目录加载
                 var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
                 if (File.Exists(filePath))
                 {
