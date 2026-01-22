@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "示例项目 (Screw Detection)",
+    "RootPath": "D:\\Data\\ScrewProject",
+    "Classes": [ "screw", "nut", "ng" ]
+  },
+  {
+    "Name": "PCB 检测",
+    "RootPath": "D:\\Data\\PCB_Project",
+    "Classes": [ "resistor", "capacitor", "ic", "defect" ]
+  }
+]

@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insight</title>
+    <style>
+        :root {
+            --primary: #00d4ff;
+            /* Cyan Blue - Tech */
+            --primary-light: #66e6ff;
+            --primary-dark: #0099cc;
+            --bg-body: #1a1f2e;
+            /* Lighter dark background */
+            --bg-card: #252b3d;
+            /* Lighter card background */
+            --bg-card-light: #30384d;
+            /* Lighter card light background */
+            --text-main: #f1f5f9;
+            /* Brighter text */
+            --text-sub: #cbd5e1;
+            /* Brighter sub text */
+            --border-color: #334155;
+            /* Lighter border */
+            --border-glow: rgba(0, 212, 255, 0.2);
+            --sidebar-width: 240px;
+            --danger: #ff6b6b;
+            --success: #10b981;
+            --warning: #fbbf24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+        }
+
+        body {
+            background: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: radial-gradient(circle at 10% 20%, rgba(40, 60, 80, 0.5) 0%, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(0, 212, 255, 0.15) 0%, transparent 50%);
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(37, 43, 61, 0.95);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            z-index: 10;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2),
+                0 0 30px rgba(0, 212, 255, 0.15);
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: -0.5px;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-sub);
+            font-weight: 600;
+            font-size: 15px;
+            background: rgba(48, 56, 77, 0.5);
+            border: 1px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: rgba(48, 56, 77, 0.8);
+            color: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 153, 204, 0.1));
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.3),
+                inset 0 0 10px rgba(0, 212, 255, 0.1);
+        }
+
+        .nav-icon {
+            font-size: 18px;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+            position: relative;
+            background: rgba(26, 31, 46, 0.95);
+        }
+
+        /* Custom Scrollbar */
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .main-content::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.3);
+            border-radius: 4px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
+        }
+
+        .view-container {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            gap: 24px;
+            animation: fadeScale 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .view-container.active {
+            display: flex;
+        }
+
+        @keyframes fadeScale {
+            from {
+                opacity: 0;
+                transform: scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Configuration Layout */
+        .config-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            /* Fixed Left, Fluid Right */
+            gap: 24px;
+            height: 100%;
+        }
+
+        .panel-col {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            height: 100%;
+        }
+
+        /* Modern Cards */
+        .card {
+            background: rgba(37, 43, 61, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2),
+                0 0 30px rgba(0, 212, 255, 0.15);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(0, 212, 255, 0.15);
+        }
+
+        .card.fill-height {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .card-header {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+        }
+
+        .card-header::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+            border-radius: 2px;
+            margin-right: 12px;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(48, 56, 77, 0.7);
+            color: var(--text-main);
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            background: rgba(48, 56, 77, 0.9);
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.2),
+                0 0 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Buttons */
+        .btn {
+            border: 1px solid transparent;
+            cursor: pointer;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4),
+                0 0 30px rgba(0, 212, 255, 0.2);
+            border-color: var(--primary);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 41, 59, 0.6);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #c0392b);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #ff8787, var(--danger));
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4),
+                0 0 30px rgba(255, 107, 107, 0.2);
+        }
+
+        .btn-icon {
+            padding: 10px;
+        }
+
+        /* Checklist */
+        .checklist-container {
+            border: 1px solid var(--border-color);
+            background: rgba(48, 56, 77, 0.7);
+            border-radius: 12px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        /* Custom Scrollbar for Checklist */
+        .checklist-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .checklist-container::-webkit-scrollbar-track {
+            background: rgba(37, 43, 61, 0.5);
+            border-radius: 3px;
+        }
+
+        .checklist-container::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(37, 43, 61, 0.6);
+            border: 1px solid transparent;
+        }
+
+        .checklist-item:hover {
+            background: rgba(48, 56, 77, 0.9);
+            border-color: var(--primary);
+        }
+
+        .checklist-item input {
+            margin-right: 12px;
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item input:checked {
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .checklist-item label {
+            font-size: 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            flex: 1;
+        }
+
+        /* Grid for Params */
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+        }
+
+        /* Switches */
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(48, 56, 77, 0.7);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(100, 116, 139, 0.5);
+            transition: all 0.3s ease;
+            border-radius: 34px;
+            border: 1px solid var(--border-color);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: all 0.3s ease;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        input:checked+.slider {
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+            border-color: var(--primary);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(18px);
+            background-color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Monitor View - Tech Theme */
+        .monitor-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .kpi-card {
+            background: rgba(37, 43, 61, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2),
+                0 0 30px rgba(0, 212, 255, 0.15);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(0, 212, 255, 0.15);
+        }
+
+        .kpi-title {
+            font-size: 13px;
+            color: var(--text-sub);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 8px;
+            font-family: 'Segoe UI', sans-serif;
+            letter-spacing: -1px;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .chart-row {
+            flex: 1;
+            /* Occupy remaining space */
+            background: rgba(37, 43, 61, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2),
+                0 0 30px rgba(0, 212, 255, 0.15);
+            border: 1px solid var(--border-color);
+            min-height: 0;
+            /* Important for flex child scroll/resize */
+            position: relative;
+        }
+
+        .log-row {
+            height: 200px;
+            background: rgba(37, 43, 61, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2),
+                0 0 40px rgba(0, 212, 255, 0.15);
+            border: 1px solid var(--border-color);
+        }
+
+        .console-log {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: #dfe6e9;
+            background: transparent;
+        }
+
+        /* Custom Scrollbar for Console */
+        .console-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .console-log::-webkit-scrollbar-track {
+            background: rgba(37, 43, 61, 0.5);
+            border-radius: 3px;
+        }
+
+        .console-log::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .status-header {
+            background: rgba(48, 56, 77, 0.8);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-sub);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: rgba(18, 24, 39, 0.95);
+            backdrop-filter: blur(15px);
+            width: 500px;
+            padding: 32px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+                0 0 80px rgba(0, 212, 255, 0.2);
+            border: 1px solid var(--border-color);
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Success Notification Toast */
+        .success-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: linear-gradient(145deg, rgba(18, 24, 39, 0.98), rgba(30, 41, 59, 0.95));
+            backdrop-filter: blur(20px);
+            padding: 40px 60px;
+            border-radius: 24px;
+            z-index: 200;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid transparent;
+            background-clip: padding-box;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6),
+                0 0 0 2px rgba(11, 232, 129, 0.5),
+                0 0 60px rgba(11, 232, 129, 0.3),
+                inset 0 0 60px rgba(11, 232, 129, 0.05);
+        }
+
+        .success-toast.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .success-toast-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+            animation: bounce 0.6s ease-out;
+        }
+
+        .success-toast-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0be881;
+            margin-bottom: 12px;
+            text-shadow: 0 0 20px rgba(11, 232, 129, 0.5);
+        }
+
+        .success-toast-message {
+            font-size: 16px;
+            color: var(--text-sub);
+            margin-bottom: 24px;
+        }
+
+        .success-toast-close {
+            background: linear-gradient(135deg, #0be881, #00b894);
+            border: none;
+            padding: 12px 32px;
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(11, 232, 129, 0.4);
+        }
+
+        .success-toast-close:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(11, 232, 129, 0.5);
+        }
+
+        @keyframes bounce {
+            0% {
+                transform: scale(0);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            70% {
+                transform: scale(0.9);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .success-toast-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 199;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .success-toast-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Log Styles */
+        .log-item {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        .log-time {
+            color: var(--text-sub);
+            margin-right: 10px;
+        }
+
+        .log-info {
+            color: #dfe6e9;
+        }
+
+        .log-error {
+            color: var(--danger);
+            text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
+        }
+
+        .log-success {
+            color: var(--success);
+            text-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+        }
+
+        .log-warning {
+            color: var(--warning);
+            text-shadow: 0 0 5px rgba(251, 191, 36, 0.5);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            transition: width 0.3s ease;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>Insight </div>
+        <div class="nav-menu">
+            <div class="nav-item active" onclick="switchTab('config')" id="nav-config"><span
+                    class="nav-icon">⚙️</span><span>任务配置</span></div>
+            <div class="nav-item" onclick="switchTab('monitor')" id="nav-monitor"><span
+                    class="nav-icon">📈</span><span>训练监控</span></div>
+            <div class="nav-item" onclick="switchTab('tools')" id="nav-tools"><span
+                    class="nav-icon">🛠️</span><span>数据转换</span></div>
+            <div class="nav-item" onclick="switchTab('models')" id="nav-models"><span
+                    class="nav-icon">📦</span><span>训练历史</span></div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="font-size: 12px; color: var(--text-sub); text-align: center; margin-top: 20px;">v2.1.0 Build
+            2025 </div>
+    </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- View: Configuration -->
+        <div id="view-config" class="view-container active">
+            <div class="config-layout">
+                <!-- Left Column: Data Source Mgmt -->
+                <div class="panel-col">
+                    <div class="card fill-height">
+                        <div class="card-header"><span>项目与数据源</span><button class="btn btn-secondary btn-icon"
+                                onclick="loadProjects()" title="刷新项目">🔄</button><button
+                                class="btn btn-primary btn-icon" onclick="openCreateProjectModal()" title="新建项目"
+                                style="margin-left: 8px;">＋</button><button class="btn btn-danger btn-icon"
+                                onclick="deleteProject()" title="删除当前项目" style="margin-left: 8px;">🗑️</button></div>
+                        <div class="form-group"><label class="form-label">当前项目 (Project)</label><select
+                                id="projectSelect" class="form-control" onchange="onProjectChanged()">
+                                <option value="">正在加载...</option>
+                            </select></div>
+                        <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+                            <label class="form-label">数据源加载 (Checklist)</label>
+                            <div id="dataSourceList" class="checklist-container">
+                                <div style="text-align: center; padding: 20px; color: #aaa; font-size: 13px;">
+                                    请选择项目 </div>
+                            </div>
+                        </div>
+                        <div class="form-group"><label class="form-label">输出路径 (Workspace)</label><input type="text"
+                                id="targetPath" class="form-control" readonly style="font-size: 12px; opacity: 0.8;">
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Column: Training Params -->
+                <div class="panel-col">
+                    <div class="card">
+                        <div class="card-header"><span>YOLO 训练参数</span><button class="btn btn-secondary"
+                                onclick="openAugmentModal()" style="font-size: 12px;">🛠️ 缺陷增强 </button></div>
+                        <div class="params-grid">
+                            <div class="form-group"><label class="form-label">模型大小</label><select id="modelSize"
+                                    class="form-control">
+                                    <optgroup label="YOLOv8">
+                                        <option value="v8n">Nano (v8n)</option>
+                                        <option value="v8s" selected>Small (v8s)</option>
+                                        <option value="v8m">Medium (v8m)</option>
+                                        <option value="v8l">Large (v8l)</option>
+                                    </optgroup>
+                                    <optgroup label="YOLOv11">
+                                        <option value="v11n">Nano (v11n)</option>
+                                        <option value="v11s">Small (v11s)</option>
+                                        <option value="v11m">Medium (v11m)</option>
+                                    </optgroup>
+                                </select></div>
+                            <div class="form-group"><label class="form-label">图片尺寸
+                                    (ImgSz)</label><input type="number" id="imgSize" class="form-control" value="640"
+                                    step="32"></div>
+                            <div class="form-group"><label class="form-label">Batch
+                                    Size</label><input type="number" id="batchSize" class="form-control" value="16"
+                                    placeholder="Auto (-1)"></div>
+                            <div class="form-group"><label class="form-label">Epochs</label><input type="number"
+                                    id="epochs" class="form-control" value="300">
+                            </div>
+                            <div class="form-group"><label class="form-label">Patience</label><input type="number"
+                                    id="patience" class="form-control" value="50">
+                            </div>
+                            <div class="form-group"><label class="form-label">Worker
+                                    Threads</label><input type="number" id="workers" class="form-control" value="8">
+                            </div>
+                            <div class="form-group"><label class="form-label">GPU
+                                    Index</label><input type="text" id="gpuIndex" class="form-control" value="0">
+                            </div>
+                        </div>
+                        <div class="params-grid" style="margin-top: 10px;">
+                            <div class="switch-row">
+                                <span>P2 小目标增强</span>
+                                <label class="switch"><input type="checkbox" id="enableP2"><span
+                                        class="slider"></span></label>
+                            </div>
+                            <div class="switch-row">
+                                <span>自动修正图片</span>
+                                <label class="switch"><input type="checkbox" id="autoFixImage" checked><span
+                                        class="slider"></span></label>
+                            </div>
+                        </div>
+
+                        <!-- Model Management Config -->
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                            <div class="params-grid">
+                                <div class="form-group">
+                                    <label class="form-label">自定义模型名称 (ONNX Name) <span
+                                            style="color: var(--text-sub); font-weight: normal; font-size: 12px;">(为空则自动命名)</span></label>
+                                    <input type="text" id="customOnnxName" class="form-control"
+                                        placeholder="例如: MyModel-v1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">模型保存目录 (Storage Path)</label>
+                                    <div class="input-group">
+                                        <input type="text" id="modelStoragePath" class="form-control" readonly
+                                            placeholder="默认: 项目根目录/models">
+                                        <button class="btn btn-secondary"
+                                            onclick="selectFolder('modelStorage')">📁</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px;"><button id="btnGenerate" class="btn btn-primary"
+                                onclick="startGenerate()" style="width: 100%;">✨ 生成数据集 (Generate) </button>
+                            <div id="statusMessage"
+                                style="text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-sub); height: 20px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="flex: 0;">
+                        <div class="card-header"><span>执行控制</span></div>
+                        <div class="form-group">
+                            <div class="input-group"><input type="text" id="pythonPath" class="form-control"
+                                    value="C:\ANACONDA\python.exe" placeholder="Python Environment Path..."
+                                    onchange="savePythonPath(this.value)"><button class="btn btn-secondary"
+                                    onclick="selectFolder('python')">📁</button></div>
+                        </div>
+                        <div style="display: flex; gap: 16px;"><button id="btnStartTrain" class="btn btn-primary"
+                                onclick="startTraining()" style="flex: 2;">🚀 开始训练</button><button id="btnStopTrain"
+                                class="btn btn-danger" onclick="stopTraining()" disabled style="flex: 1;">⏹
+                                停止</button><button id="btnOpenOutput" class="btn btn-secondary"
+                                onclick="openOutputFolder()" style="display: none;">📂 结果</button></div>
+                    </div>
+                    <!-- Layout Optimization: System Status & Mini Log -->
+                    <!-- Flex-grow to fill the remaining vertical space -->
+                    <div class="card" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                        <div class="card-header"><span>系统状态与日志 (System Status)</span><span
+                                style="font-size: 11px; color: var(--text-sub);">Live</span>
+                        </div>
+                        <!-- Status Grid -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                            <div
+                                style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                                <div style="font-size: 18px;">🐍</div>
+                                <div>
+                                    <div style="font-size: 10px; color: var(--text-sub);">
+                                        Python Environment</div>
+                                    <div style="font-size: 12px; font-weight: 600; color: #0be881;">
+                                        Detected</div>
+                                </div>
+                            </div>
+                            <div
+                                style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                                <div style="font-size: 18px;">🎮</div>
+                                <div>
+                                    <div style="font-size: 10px; color: var(--text-sub);">
+                                        GPU Acceleration</div>
+                                    <div style="font-size: 12px; font-weight: 600; color: #0be881;" id="gpuStatus">
+                                        Ready </div>
+                                </div>
+                            </div>
+                            <!-- More metrics can be added here -->
+                        </div>
+                        <!-- Mini Console -->
+                        <div style="flex: 1; background: #000; border-radius: 6px; padding: 10px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; color: #dcdde1;"
+                            id="configConsole">
+                            <div style="color: #7f8fa4;">>System initialized...
+                            </div>
+                            <div style="color: #7f8fa4;">>Waiting for commands...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- View: Monitor -->
+        <div id="view-monitor" class="view-container">
+            <div class="monitor-layout">
+                <!-- KPI Cards -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-title">🔄 Epochs</div>
+                        <div class="kpi-value" id="kpi-epoch">0/0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">🎯 Box Loss</div>
+                        <div class="kpi-value" id="kpi-loss" style="color: #d98e84;">0.00</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">📈 mAP50</div>
+                        <div class="kpi-value" id="kpi-map50" style="color: #8cb6a8;">0.00</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">🚀 mAP50-95</div>
+                        <div class="kpi-value" id="kpi-map95" style="color: #e6c587;">0.00</div>
+                    </div>
+                </div>
+                <!-- Main Chart -->
+                <div class="chart-row"><canvas id="trainingChart"></canvas></div>
+                <!-- Terminal & Progress -->
+                <div class="log-row">
+                    <div class="status-header">
+                        <div style="display:flex; gap:15px;"><span id="progressStatus">Ready</span><span
+                                id="progressETA" style="color: #0be881;"></span></div><span
+                            id="progressPercent">0%</span>
+                    </div>
+                    <div style="height: 4px; background: rgba(255,255,255,0.1);">
+                        <div class="progress-bar" id="progressFill" style="height:100%; width:0%; background:#0be881;">
+                        </div>
+                    </div>
+                    <div class="console-log" id="console">
+                        <div class="log-item"><span class="log-time">[System]</span>Ready to train.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- View: Tools (Data Converter) -->
+        <div id="view-tools" class="view-container">
+            <div class="card">
+                <div class="card-header"><span>LabelMe 转 YOLO (Converter)</span></div>
+                <div class="form-group"><label class="form-label">源文件夹路径 (LabelMe JSONs +
+                        Images)</label>
+                    <div class="input-group"><input type="text" id="toolSourcePath" class="form-control"
+                            placeholder="选择包含 JSON 和图片的文件夹..."><button class="btn btn-secondary"
+                            onclick="selectFolder('toolSource')">📁</button></div>
+                </div>
+                <div class="form-group"><label class="form-label">目标保存路径 (Output Folder)</label>
+                    <div class="input-group"><input type="text" id="toolTargetPath" class="form-control"
+                            placeholder="选择转换结果保存位置..."><button class="btn btn-secondary"
+                            onclick="selectFolder('toolTarget')">📁</button></div>
+                </div>
+                <div style="margin-top: 24px;"><button class="btn btn-primary" onclick="startToolConversion()"
+                        style="width: 100%;">🚀 开始转换 (Start
+                        Conversion) </button></div>
+            </div>
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-header"><span>转换日志 (Log)</span></div>
+                <div class="console-log" id="toolConsole" style="background: #1e272e; border-radius: 12px;">
+                    <div class="log-item"><span class="log-time">[System]</span>Ready for
+                        conversion.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Training History (Simplified) -->
+        <div id="view-models" class="view-container">
+            <div class="card fill-height">
+                <div class="card-header">
+                    <span>训练历史 (Training History)</span>
+                    <button class="btn btn-secondary btn-icon" onclick="loadTrainingHistory()" title="刷新历史">🔄</button>
+                </div>
+
+                <div class="checklist-container" style="background: rgba(30, 41, 59, 0.4);">
+                    <table style="width: 100%; border-collapse: collapse; color: var(--text-sub); font-size: 14px;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+                                <th style="padding: 12px;">项目 (Project)</th>
+                                <th style="padding: 12px;">配置 (Config)</th>
+                                <th style="padding: 12px;">训练指标 (Metrics)</th>
+                                <th style="padding: 12px; width: 150px;">时间 (Date)</th>
+                                <th style="padding: 12px; width: 60px; text-align: center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trainingHistoryBody">
+                            <!-- Training history entries will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Project Modal -->
+    <div id="createProjectModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);">新建项目
+                (Create Project)</h3>
+            <div class="form-group"><label class="form-label">项目名称 (Name)</label><input type="text" id="newProjectName"
+                    class="form-control" placeholder="例如: Screw Detection"></div>
+            <div class="form-group"><label class="form-label">项目根目录 (Root Path)</label>
+                <div class="input-group"><input type="text" id="newProjectRoot" class="form-control" readonly
+                        placeholder="选择空文件夹或现有数据文件夹..."><button class="btn btn-secondary"
+                        onclick="selectFolder('newProjectRoot')">📁</button></div>
+            </div>
+            <div class="form-group"><label class="form-label">包含类别 (Classes)</label><input type="text"
+                    id="newProjectClasses" class="form-control" placeholder="用逗号分隔, 例如: screw, nut, ng">
+                <p style="font-size: 12px; color: #999; margin-top: 4px;">* 对应 YOLO data.yaml 中的 names</p>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;"><button
+                    class="btn btn-secondary" onclick="closeCreateProjectModal()">取消</button><button
+                    class="btn btn-primary" onclick="createProject()">创建</button></div>
+        </div>
+    </div>
+    <!-- Modals -->
+    <div id="augmentModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);">缺陷样本增强
+            </h3>
+            <div class="form-group"><label class="form-label">源路径 (Source)</label>
+                <div class="input-group"><input type="text" id="augmentSourcePath" class="form-control" readonly><button
+                        class="btn btn-secondary" onclick="selectFolder('augmentSource')">📁</button></div>
+            </div>
+            <div class="form-group"><label class="form-label">素材路径 (Defect Assets)</label>
+                <div class="input-group"><input type="text" id="holeAssetsPath" class="form-control" readonly><button
+                        class="btn btn-secondary" onclick="selectFolder('holeAssets')">📁</button></div>
+            </div>
+            <div class="form-group"><label class="form-label">生成比例: <span id="mutationRateVal">30%</span></label><input
+                    type="range" id="mutationRate" style="width: 100%; accent-color: var(--primary);" min="10" max="80"
+                    value="30" oninput="document.getElementById('mutationRateVal').innerText = this.value + '%'">
+            </div>
+            <div style="background: #f5f5f5; border-radius: 8px; height: 6px; overflow: hidden; margin: 20px 0;">
+                <div id="augmentFill"
+                    style="background: var(--primary); width: 0%; height: 100%; transition: width 0.3s;">
+                </div>
+            </div>
+            <div id="augmentStatus"
+                style="font-size: 12px; color: var(--text-sub); margin-bottom: 20px; text-align: center;">
+                Wait</div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;"><button class="btn btn-secondary"
+                    onclick="closeAugmentModal()">取消</button><button class="btn btn-primary"
+                    onclick="startAugmentation()">开始生成</button></div>
+        </div>
+    </div>
+    <!-- Success Notification Toast -->
+    <div id="successToastOverlay" class="success-toast-overlay"></div>
+    <div id="successToast" class="success-toast">
+        <div class="success-toast-icon">🎉</div>
+        <div class="success-toast-title" id="successToastTitle">操作完成！</div>
+        <div class="success-toast-message" id="successToastMessage">数据集生成已成功完成</div>
+        <button class="success-toast-close" onclick="hideSuccessToast()">确定</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script> // ========== Tabs Management ==========
+
+        function switchTab(viewId) {
+            // Update Nav
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-' + viewId).classList.add('active');
+
+            // Update View
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.getElementById('view-' + viewId).classList.add('active');
+
+            if (viewId === 'monitor' && chartInstance) {
+                setTimeout(() => chartInstance.resize(), 100);
+            }
+
+            if (viewId === 'models') {
+                loadTrainingHistory();
+            }
+        }
+
+        // ========== Project Management ==========
+        let currentProjects = [];
+        let currentProjectConfig = null;
+
+        function loadProjects() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_projects'
+            }));
+        }
+
+        function onProjectChanged() {
+            const select = document.getElementById('projectSelect');
+            const idx = select.selectedIndex;
+
+            if (idx >= 0 && currentProjects[idx]) {
+                currentProjectConfig = currentProjects[idx];
+
+                // Update Target Path (Constructed)
+                const workspace = currentProjectConfig.RootPath + "\\dataset";
+                document.getElementById('targetPath').value = workspace;
+
+                // Request Subfolders
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'get_subfolders',
+                    path: currentProjectConfig.RootPath
+                }));
+            }
+        }
+
+        function updateProjectList(projects) {
+            currentProjects = projects;
+            const select = document.getElementById('projectSelect');
+            select.innerHTML = '';
+
+            projects.forEach((p, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = p.Name;
+                select.appendChild(opt);
+            });
+
+            if (projects.length > 0) {
+                onProjectChanged();
+            }
+
+            else {
+                document.getElementById('dataSourceList').innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">请先创建项目 (projects.json)</div>';
+            }
+        }
+
+        function updateSubFolders(folders) {
+            const list = document.getElementById('dataSourceList');
+            list.innerHTML = '';
+
+            if (!folders || folders.length === 0) {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">未找到子文件夹</div>';
+                return;
+            }
+
+            folders.forEach(folder => {
+                const item = document.createElement('div');
+                item.className = 'checklist-item';
+
+                item.onclick = function (e) {
+                    if (e.target.type !== 'checkbox') {
+                        const cb = item.querySelector('input');
+                        cb.checked = !cb.checked;
+                    }
+                }
+
+                    ;
+
+                const inp = document.createElement('input');
+                inp.type = 'checkbox';
+                inp.value = folder;
+
+                const lbl = document.createElement('label');
+                lbl.innerText = folder;
+
+                item.appendChild(inp);
+                item.appendChild(lbl);
+                list.appendChild(item);
+            });
+        }
+
+        // ========== WebView2 Bridge ==========
+        window.chrome.webview.addEventListener('message', event => {
+            const data = JSON.parse(event.data); // Make sure backend sends stringified JSON or object
+
+            if (data.action === 'projects_loaded') {
+                updateProjectList(data.projects);
+            }
+
+            else if (data.action === 'subfolders_loaded') {
+                updateSubFolders(data.folders);
+            }
+
+            else if (data.action === 'log') {
+                addLog(data.message, data.type);
+            }
+
+            else if (data.action === 'training_data') {
+                // data: { epoch, box_loss, map50, map5095, progress }
+                updateChart(data.epoch, data.box_loss, data.map50, data.map5095);
+
+                // Update Progress
+                if (data.progress !== undefined) {
+                    const pct = Math.round(data.progress) + '%';
+                    document.getElementById('progressFill').style.width = pct;
+                    document.getElementById('progressPercent').innerText = pct;
+                    document.getElementById('progressStatus').innerText = 'Epoch: ' + data.epoch;
+
+                    // ETA Logic
+                    updateETA(data.epoch);
+                }
+            }
+
+            else if (data.action === 'folder_selected') {
+                if (data.type === 'python') {
+                    document.getElementById('pythonPath').value = data.path;
+                    savePythonPath(data.path);
+                }
+                else if (data.type === 'augmentSource') document.getElementById('augmentSourcePath').value = data.path;
+                else if (data.type === 'holeAssets') document.getElementById('holeAssetsPath').value = data.path;
+                else if (data.type === 'newProjectRoot') document.getElementById('newProjectRoot').value = data.path;
+                else if (data.type === 'toolSource') document.getElementById('toolSourcePath').value = data.path;
+                else if (data.type === 'toolTarget') document.getElementById('toolTargetPath').value = data.path;
+                else if (data.type === 'modelStorage') {
+                    document.getElementById('modelStoragePath').value = data.path;
+                    localStorage.setItem('insight_model_storage_path', data.path);
+                    // If we are in model tab, refresh
+                    if (document.getElementById('view-models').classList.contains('active')) {
+                        refreshModels();
+                    }
+                }
+            }
+
+            else if (data.action === 'augment_progress') {
+                document.getElementById('augmentFill').style.width = data.progress + '%';
+                document.getElementById('augmentPercent').innerText = data.progress + '%';
+            }
+
+            else if (data.action === 'augment_complete') {
+                document.getElementById('augmentFill').style.width = '100%';
+                document.getElementById('augmentPercent').innerText = '100%';
+
+                setTimeout(() => {
+                    closeAugmentModal(); addLog('Augmentation Complete', 'success');
+                }
+
+                    , 1000);
+            }
+
+            else if (data.action === 'training_finished') {
+                addLog('Training Finished!', 'success');
+                document.getElementById('btnStartTrain').disabled = false;
+                document.getElementById('btnStopTrain').disabled = true;
+                document.getElementById('btnOpenOutput').style.display = 'inline-flex';
+                document.getElementById('progressStatus').innerText = 'Done';
+            }
+
+            else if (data.action === 'training_stopped') {
+                addLog('Training Stopped', 'warning');
+                document.getElementById('btnStartTrain').disabled = false;
+                document.getElementById('btnStopTrain').disabled = true;
+                document.getElementById('progressStatus').innerText = 'Stopped';
+            }
+
+            else if (data.action === 'complete') {
+                // 显示醒目的完成通知
+                showSuccessToast(data.message);
+                addLog(data.message, 'success');
+            }
+
+            else if (data.action === 'error') {
+                addLog(data.message, 'error');
+            }
+
+            else if (data.action === 'training_history_loaded') {
+                renderTrainingHistory(data.history || []);
+            }
+        });
+
+        // ========== Chart Logic ==========
+        var chartInstance = null;
+        var trainStartTime = 0;
+
+        function initChart() {
+            var ctx = document.getElementById('trainingChart').getContext('2d');
+            Chart.defaults.color = '#aab8c2';
+            Chart.defaults.borderColor = 'rgba(0,0,0,0.05)';
+
+            chartInstance = new Chart(ctx, {
+
+                type: 'line',
+                data: {
+
+                    labels: [],
+                    datasets: [{
+                        label: 'Box Loss', data: [], borderColor: '#d98e84', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y'
+                    }
+
+                        ,
+                    {
+                        label: 'mAP50', data: [], borderColor: '#8cb6a8', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1'
+                    }
+
+                        ,
+                    {
+                        label: 'mAP50-95', data: [], borderColor: '#e6c587', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1'
+                    }
+
+                    ]
+                }
+
+                ,
+                options: {
+
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: {
+                        mode: 'index', intersect: false
+                    }
+
+                    ,
+                    plugins: {
+                        legend: {
+                            labels: {
+
+                                color: '#636e72',
+                                font: {
+                                    family: "'Microsoft YaHei UI', 'Segoe UI', sans-serif", size: 12, weight: '500'
+                                }
+
+                                ,
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                padding: 20
+                            }
+                        }
+
+                        ,
+                        tooltip: {
+
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2d3436',
+                            bodyColor: '#636e72',
+                            borderColor: '#e6e8e9',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            bodyFont: {
+                                family: "'Microsoft YaHei UI', sans-serif"
+                            }
+                        }
+                    }
+
+                    ,
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#b2bec3', maxTicksLimit: 10
+                            }
+
+                            , grid: {
+                                display: false
+                            }
+                        }
+
+                        ,
+                        y: {
+
+                            type: 'linear', display: true, position: 'left',
+                            title: {
+                                display: true, text: 'Loss', color: '#d98e84', font: {
+                                    size: 11, weight: 'bold'
+                                }
+                            }
+
+                            ,
+                            ticks: {
+                                color: '#d98e84'
+                            }
+
+                            ,
+                            grid: {
+                                borderDash: [4, 4], color: 'rgba(0,0,0,0.05)'
+                            }
+                        }
+
+                        ,
+                        y1: {
+
+                            type: 'linear', display: true, position: 'right',
+                            title: {
+                                display: true, text: 'Metric', color: '#8cb6a8', font: {
+                                    size: 11, weight: 'bold'
+                                }
+                            }
+
+                            ,
+                            ticks: {
+                                color: '#8cb6a8'
+                            }
+
+                            ,
+                            grid: {
+                                display: false
+                            }
+
+                            ,
+                            min: 0, max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        setTimeout(initChart, 200);
+
+        function updateChart(epoch, boxLoss, map50, map5095) {
+            if (!chartInstance) return;
+
+            // New epoch logic (simplistic)
+            // If label exists, update it? No, just push for now mostly, or replace if last was 'val'
+            // For simplicity here, just Push.
+            if (epoch === '1/...') {
+                // Reset
+                chartInstance.data.labels = [];
+                chartInstance.data.datasets.forEach(d => d.data = []);
+            }
+
+            // If we receive "3/300", we parse it for display, but for chart we just push
+            // But we need to handle duplicates/updates.
+
+            // Just push for execution speed
+            chartInstance.data.labels.push(epoch);
+            chartInstance.data.datasets[0].data.push(boxLoss);
+
+            if (map50 !== undefined) {
+                chartInstance.data.datasets[1].data.push(map50);
+                document.getElementById('kpi-map50').innerText = map50.toFixed(3);
+            }
+
+            else {
+                // If map50 comes in a separate event, we might need logic to align. 
+                // But typically it comes same time or we hold. 
+                // For simplified flow, we just duplicate previous if missing or push null.
+                // Actually in 'updateChart' calls from C#, 'val' events send map50/map5095.
+                // We need to handle map50/95 updating KPI.
+            }
+
+            if (map5095 !== undefined) {
+                chartInstance.data.datasets[2].data.push(map5095);
+                document.getElementById('kpi-map95').innerText = map5095.toFixed(3);
+            }
+
+            chartInstance.update();
+
+            // KPI Updates
+            if (epoch !== 'val') {
+                document.getElementById('kpi-epoch').innerText = epoch;
+                if (boxLoss) document.getElementById('kpi-loss').innerText = boxLoss.toFixed(4);
+            }
+        }
+
+        function updateETA(epochStr) {
+            if (trainStartTime === 0) trainStartTime = Date.now();
+
+            if (typeof epochStr === 'string' && epochStr.includes('/')) {
+                const parts = epochStr.split('/');
+                const current = parseInt(parts[0]);
+                const total = parseInt(parts[1]);
+
+                if (current > 0 && total > 0) {
+                    const elapsed = (Date.now() - trainStartTime) / 1000;
+                    const avg = elapsed / current;
+                    const remaining = (total - current) * avg;
+
+                    const m = Math.floor(remaining / 60);
+                    const s = Math.floor(remaining % 60);
+
+                    document.getElementById('progressETA').innerText = `ETA: ${m}m ${s}s`;
+                }
+            }
+        }
+
+        function addLog(msg, type = 'info') {
+
+            // Update Status Message on Config Tab
+            if (msg.includes('生成数据集') || msg.includes('Processing')) {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#7f8fa4';
+            }
+
+            if (msg.includes('完成') || msg.includes('Success')) {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#00b894';
+            }
+
+            if (type === 'error') {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#d63031';
+            }
+
+            // Sync to Main Console
+            const consoleDiv = document.getElementById('console');
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            const time = new Date().toLocaleTimeString();
+            let colorClass = 'log-info';
+            if (type === 'error') colorClass = 'log-error';
+            if (type === 'success') colorClass = 'log-success';
+            if (type === 'warning') colorClass = 'log-warning';
+
+            item.innerHTML = `<span class="log-time">[${time}]</span><span class="${colorClass}">${msg}</span>`;
+            consoleDiv.appendChild(item);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+
+            // Sync to Mini Console (Config Tab)
+            const miniConsole = document.getElementById('configConsole');
+            if (miniConsole) {
+                const miniItem = document.createElement('div');
+                miniItem.style.marginBottom = '2px';
+                miniItem.style.color = (type === 'error') ? '#ff5252' : ((type === 'success') ? '#0be881' : '#dcdde1');
+                miniItem.innerText = `>${msg}`;
+                miniConsole.appendChild(miniItem);
+                miniConsole.scrollTop = miniConsole.scrollHeight;
+            }
+
+            // Sync to Tool Console
+            const toolConsole = document.getElementById('toolConsole');
+            if (toolConsole) {
+                const item = document.createElement('div');
+                item.className = 'log-item';
+                const time = new Date().toLocaleTimeString();
+
+                let colorClass = 'log-info';
+                if (type === 'error') colorClass = 'log-error';
+                if (type === 'success') colorClass = 'log-success';
+
+                item.innerHTML = `<span class="log-time">[${time}]</span><span class="${colorClass}">${msg}</span>`;
+                toolConsole.appendChild(item);
+                toolConsole.scrollTop = toolConsole.scrollHeight;
+            }
+        }
+
+        // ========== Success Toast Notification ==========
+        function showSuccessToast(message, title = '操作完成！') {
+            document.getElementById('successToastTitle').innerText = title;
+            document.getElementById('successToastMessage').innerText = message;
+            document.getElementById('successToastOverlay').classList.add('show');
+            document.getElementById('successToast').classList.add('show');
+
+            // 播放提示音 (可选)
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAB/f39/');
+                audio.volume = 0.3;
+                audio.play().catch(() => { });
+            } catch (e) { }
+        }
+
+        function hideSuccessToast() {
+            document.getElementById('successToastOverlay').classList.remove('show');
+            document.getElementById('successToast').classList.remove('show');
+        }
+
+        // ========== Actions ==========
+        function selectFile(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_file', type: type
+            }));
+        }
+
+        function selectFolder(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder', type: type
+            }));
+        }
+
+        function startGenerate() {
+            if (!currentProjectConfig) {
+                alert('请先选择项目');
+                return;
+            }
+
+            // Collect checked folders
+            const checkboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]:checked');
+
+            if (checkboxes.length === 0) {
+                alert('请至少勾选一个数据源文件夹');
+                return;
+            }
+
+            const sourcePaths = Array.from(checkboxes).map(cb => {
+                return currentProjectConfig.RootPath + "\\" + cb.value;
+            });
+
+            const conf = {
+                action: 'generate',
+                sourcePaths: sourcePaths,
+                targetPath: document.getElementById('targetPath').value,
+                classes: currentProjectConfig.Classes,
+
+                modelSize: document.getElementById('modelSize').value,
+                imgSize: parseInt(document.getElementById('imgSize').value),
+                epochs: parseInt(document.getElementById('epochs').value),
+                batchSize: parseInt(document.getElementById('batchSize').value),
+                patience: parseInt(document.getElementById('patience').value),
+                workers: parseInt(document.getElementById('workers').value),
+                gpuIndex: document.getElementById('gpuIndex').value,
+                enableP2: document.getElementById('enableP2').checked,
+                autoFixImage: document.getElementById('autoFixImage').checked
+            };
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function startTraining() {
+            switchTab('monitor');
+            addLog("正在发送训练请求...", "info");
+            trainStartTime = 0;
+            document.getElementById('progressETA').innerText = '';
+
+            const workDir = document.getElementById('targetPath').value;
+
+            document.getElementById('btnStartTrain').disabled = true;
+            document.getElementById('btnStopTrain').disabled = false;
+
+            // New Params
+            const customOnnxName = document.getElementById('customOnnxName').value;
+            const modelStoragePath = document.getElementById('modelStoragePath').value || "";
+
+            // Save storage path if set
+            if (modelStoragePath) {
+                localStorage.setItem('insight_model_storage_path', modelStoragePath);
+            }
+
+            const conf = {
+                action: 'start_training',
+                pythonPath: document.getElementById('pythonPath').value,
+                workDir: workDir,
+                // Add missing params from UI that were not in original startTraining but might be needed
+                // actually original startTraining only sent pythonPath and workDir, 
+                // but HandleStartTraining in backend reads everything from 'data'.
+                // The previous HandleGenerate used a different set. 
+                // Let's ensure startTraining sends ALL params needed by backend HandleStartTraining.
+                // Re-reading HandleStartTraining in Insight.cs (lines 895+) would show what it needs.
+                // Assuming backend reads from the same 'data' object.
+
+                // Oops, looking at Insight.cs HandleStartTraining (viewed previously), it seemingly re-reads params?
+                // No, HandleStartTraining (step 292 view) wasn't fully shown. 
+                // But HandleGenerate (lines 392) reads params.
+                // Let's assume HandleStartTraining in backend reads these too.
+                // The user's original startTraining (line 1665) ONLY sent pythonPath and workDir.
+                // This implies HandleStartTraining might have been reading from a 'config' or maybe the user ISN'T sending params?
+                // Wait, if I scroll up to 1665 in existing file, it only sends pythonPath and workDir.
+                // This is weird. Let me assume I need to send everything.
+                modelSize: document.getElementById('modelSize').value,
+                imgSize: parseInt(document.getElementById('imgSize').value) || 640,
+                epochs: parseInt(document.getElementById('epochs').value) || 300,
+                batchSize: parseInt(document.getElementById('batchSize').value) || 16,
+                patience: parseInt(document.getElementById('patience').value) || 50,
+                workers: parseInt(document.getElementById('workers').value) || 8,
+                gpuIndex: document.getElementById('gpuIndex').value || "0",
+                enableP2: document.getElementById('enableP2').checked,
+                autoFixImage: document.getElementById('autoFixImage').checked,
+                onnxName: customOnnxName,
+                modelStoragePath: modelStoragePath,
+                classes: (currentProjectConfig && currentProjectConfig.Classes) ? currentProjectConfig.Classes : []
+            };
+
+            console.log("Sending training config:", conf);
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function stopTraining() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'stop_training'
+            }));
+        }
+
+        // --- Model Management Logic ---
+
+        function getModelStoragePath() {
+            // Priority 1: User-specified custom path
+            let path = document.getElementById('modelStoragePath').value;
+
+            // Priority 2: Saved in localStorage
+            if (!path) {
+                path = localStorage.getItem('insight_model_storage_path');
+            }
+
+            // Priority 3: Current project's dataset folder (where training outputs go)
+            if (!path && currentProjectConfig && currentProjectConfig.RootPath) {
+                path = currentProjectConfig.RootPath + "\\dataset";
+            }
+
+            // Priority 4: targetPath input (only works when on Config tab)
+            if (!path) {
+                path = document.getElementById('targetPath').value;
+            }
+
+            console.log("[getModelStoragePath] Resolved path:", path);
+            return path;
+        }
+
+        // === Simplified Training History ===
+
+        function loadTrainingHistory() {
+            console.log("[loadTrainingHistory] Requesting training history...");
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_training_history'
+            }));
+        }
+
+        function renderTrainingHistory(entries) {
+            const tbody = document.getElementById('trainingHistoryBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (!entries || entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #aaa; padding: 30px;">暂无训练记录。完成一次训练后这里会显示历史。</td></tr>';
+                return;
+            }
+
+            // Sort by date descending (newest first)
+            entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            entries.forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+
+                // Project Name
+                const projectName = entry.projectName || 'Unknown';
+
+                // Config: modelSize, imgSize, epochs, batchSize
+                const configStr = `${entry.modelSize || '-'} | ${entry.imgSize || 640}px | ${entry.epochs || '-'}e | B${entry.batchSize || '-'}`;
+
+                // Training Metrics: Loss / mAP50 / mAP50-95
+                const loss = entry.finalLoss !== undefined ? entry.finalLoss.toFixed(3) : '-';
+                const map50 = entry.mAP50 !== undefined ? (entry.mAP50 * 100).toFixed(1) + '%' : '-';
+                const map5095 = entry.mAP5095 !== undefined ? (entry.mAP5095 * 100).toFixed(1) + '%' : '-';
+                const metricsStr = `
+                    <span style="background:rgba(255,100,100,0.2); color:#ff6b6b; padding:2px 6px; border-radius:4px; margin-right:4px; font-size:11px;">Loss: ${loss}</span>
+                    <span style="background:rgba(0,212,255,0.2); color:#0be881; padding:2px 6px; border-radius:4px; margin-right:4px; font-size:11px;">mAP50: ${map50}</span>
+                    <span style="background:rgba(100,200,255,0.2); color:#74b9ff; padding:2px 6px; border-radius:4px; font-size:11px;">mAP50-95: ${map5095}</span>
+                `;
+
+                // Date
+                const dateStr = entry.date || '-';
+
+                // Build row HTML (without button)
+                tr.innerHTML = `
+                    <td style="padding: 12px; font-weight: 500;">${projectName}</td>
+                    <td style="padding: 12px; font-size: 12px; color: #aaa;">${configStr}</td>
+                    <td style="padding: 12px;">${metricsStr}</td>
+                    <td style="padding: 12px; font-size: 12px; color: #aaa;">${dateStr}</td>
+                    <td style="padding: 12px; text-align: center;" class="action-cell"></td>
+                `;
+
+                // Create button programmatically to avoid escaping issues
+                const modelPath = entry.modelPath || '';
+                console.log("[renderTrainingHistory] Creating button for path:", modelPath);
+                const actionCell = tr.querySelector('.action-cell');
+                console.log("[renderTrainingHistory] Found action cell:", actionCell);
+
+                if (modelPath && actionCell) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary btn-icon';
+                    btn.title = '打开模型所在文件夹';
+                    btn.textContent = '📂';
+                    // Store path as data attribute
+                    btn.dataset.path = modelPath;
+                    btn.onclick = function (e) {
+                        var path = e.target.dataset.path;
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            action: 'open_model_folder',
+                            path: path
+                        }));
+                    };
+                    actionCell.appendChild(btn);
+                } else {
+                    if (actionCell) actionCell.textContent = '-';
+                }
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openModelFolder(modelPath) {
+            console.log("[openModelFolder] Called with:", modelPath);
+            addLog("正在打开文件夹: " + modelPath, "info");
+            if (!modelPath) {
+                addLog("路径为空，无法打开", "warning");
+                return;
+            }
+            try {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'open_model_folder',
+                    path: modelPath
+                }));
+                console.log("[openModelFolder] Message sent to backend");
+            } catch (err) {
+                console.error("[openModelFolder] Error:", err);
+                addLog("发送消息失败: " + err.message, "error");
+            }
+        }
+
+
+        function refreshModels() {
+            const path = getModelStoragePath();
+            console.log("[refreshModels] Final path:", path);
+
+            if (!path) {
+                console.warn("[refreshModels] No path available, cannot load models");
+                addLog("无法加载模型列表: 请先选择项目或设置模型存储路径", "warning");
+                return;
+            }
+
+            // Sync UI
+            document.getElementById('currentModelPath').value = path;
+            document.getElementById('modelStoragePath').value = path;
+
+            console.log("[refreshModels] Sending get_models request for:", path);
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_models',
+                path: path
+            }));
+        }
+
+        function filterModels() {
+            const query = document.getElementById('modelSearch').value.toLowerCase();
+            const filtered = currentModelList.filter(m => m.name.toLowerCase().includes(query));
+            renderModelList(filtered);
+        }
+
+        function renderModelList(models) {
+            const tbody = document.getElementById('modelTableBody');
+            tbody.innerHTML = '';
+
+            // Update Header if needed (We need to insert header rows dynamically or assume fixed HTML)
+            // Ideally we should update the HTML structure of the table too.
+            // But let's cheat and update the THEAD via JS or just rewrite row content carefully.
+            // Better: Let's assume user accepts I change the THEAD in HTML too. 
+            // I will target the THEAD in a separate edit or just force it here if I can ? 
+            // No, renderModelList only touches TBODY.
+            // I will use a separate replacement for the HTML structure.
+            // For now, let's look at the JS logic assuming the columns are:
+            // Name | Config | Labels | Time | Actions
+
+            if (!models || models.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #aaa; padding: 20px;">No models found. Train one to see history!</td></tr>';
+                return;
+            }
+
+            models.forEach(model => {
+                const tr = document.createElement('tr');
+
+                // --- Metadata Parsing ---
+                let configStr = '<span style="color:#aaa;">-</span>';
+                let labelsStr = '<span style="color:#aaa;">-</span>';
+                let sizeStr = model.size;
+
+                if (model.metadata && model.metadata.paramsData) {
+                    const p = model.metadata.paramsData;
+                    // Format: v8s | 640 | Ep:300 | B:16
+                    configStr = `<span class="badge" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); font-family:Consolas;">${p.ModelSize}</span> 
+                                 <span style="color:var(--text-sub); font-size:11px;">${p.ImgSize}px</span>
+                                 <span style="color:var(--text-sub); font-size:11px;">Ep:${p.Epochs}</span>`;
+
+                    // Classes
+                    if (p.Classes && p.Classes.length > 0) {
+                        labelsStr = p.Classes.map(c => `<span class="badge" style="background:rgba(0,210,255,0.1); color:var(--primary); margin-right:4px;">${c}</span>`).join('');
+                    }
+                }
+
+                // Name Column (Icon + Name)
+                const nameHtml = `<div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:16px;">📦</span>
+                                    <div>
+                                        <div style="font-weight:bold; font-size:13px;">${model.name}</div>
+                                        <div style="font-size:11px; color:#aaa;">${model.size}</div>
+                                    </div>
+                                  </div>`;
+
+                tr.innerHTML = `
+                    <td style="padding: 12px;">${typeBadge}</td>
+                    <td style="padding: 12px;">${model.size}</td>
+                    <td style="padding: 12px;">${model.date}</td>
+                    <td style="padding: 12px; text-align: right; display:flex; gap:6px; justify-content:flex-end;">${actions}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openModelFolder() {
+            const path = getModelStoragePath();
+            if (path) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'open_output',
+                    path: path
+                }));
+            }
+        }
+
+        function renameModel(oldName) {
+            const newName = prompt("请输入新名称 (无需后缀):", oldName.replace(/\.(onnx|pt)$/i, ""));
+            if (newName && newName !== oldName.replace(/\.(onnx|pt)$/i, "")) {
+                const ext = oldName.split('.').pop();
+                const fullName = newName.endsWith('.' + ext) ? newName : newName + '.' + ext;
+
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'rename_model',
+                    path: getModelStoragePath(),
+                    oldName: oldName,
+                    newName: fullName
+                }));
+            }
+        }
+
+        function deleteModel(fileName) {
+            if (confirm(`确定要删除模型 ${fileName} 吗？此操作不可恢复。`)) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_model',
+                    path: getModelStoragePath(),
+                    fileName: fileName
+                }));
+            }
+        }
+
+        function convertModel(fileName) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'convert_model',
+                sourcePath: getModelStoragePath() + "\\" + fileName,
+                targetDir: getModelStoragePath(),
+                pythonPath: document.getElementById('pythonPath').value
+            }));
+        }
+
+        function openOutputFolder() {
+            const p = document.getElementById('targetPath').value;
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'open_output', path: p
+            }));
+        }
+
+        // Create Project Modal
+        function openCreateProjectModal() {
+            document.getElementById('createProjectModal').style.display = 'flex';
+        }
+
+        function closeCreateProjectModal() {
+            document.getElementById('createProjectModal').style.display = 'none';
+        }
+
+        function createProject() {
+            const name = document.getElementById('newProjectName').value;
+            const root = document.getElementById('newProjectRoot').value;
+            const classes = document.getElementById('newProjectClasses').value;
+
+            if (!name || !root) {
+                alert('项目名称和根目录不能为空');
+                return;
+            }
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'create_project',
+                name: name,
+                rootPath: root,
+                classes: classes
+            }));
+
+            closeCreateProjectModal();
+        }
+
+        function deleteProject() {
+            if (!currentProjectConfig) return;
+            const idx = document.getElementById('projectSelect').selectedIndex;
+            if (idx < 0) return;
+
+            if (confirm('确定要删除当前项目吗？此操作仅移除列表项，不会删除硬盘文件。')) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_project',
+                    index: idx
+                }));
+            }
+        }
+
+        // Defect Modal
+        function openAugmentModal() {
+            document.getElementById('augmentModal').style.display = 'flex';
+        }
+
+        function closeAugmentModal() {
+            document.getElementById('augmentModal').style.display = 'none';
+        }
+
+        function startAugmentation() {
+            const conf = {
+                action: 'defect_augmentation',
+                sourcePath: document.getElementById('augmentSourcePath').value,
+                holeAssetsPath: document.getElementById('holeAssetsPath').value,
+                mutationRate: parseInt(document.getElementById('mutationRate').value)
+            };
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        // Helper
+        function selectFolder(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder',
+                type: type
+            }));
+        }
+
+        function startToolConversion() {
+            const src = document.getElementById('toolSourcePath').value;
+            const tgt = document.getElementById('toolTargetPath').value;
+
+            if (!src || !tgt) {
+                alert('请先选择源文件夹和目标路径');
+                return;
+            }
+
+            // Clear log
+            document.getElementById('toolConsole').innerHTML = '<div class="log-item"><span class="log-time">[System]</span>Starting conversion...</div>';
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'convert_tool',
+                sourcePath: src,
+                targetPath: tgt
+            }));
+        }
+
+        // ========== Python Path Persistence ==========
+        function loadPythonPath() {
+            const savedPath = localStorage.getItem('pythonPath');
+            if (savedPath) {
+                document.getElementById('pythonPath').value = savedPath;
+            }
+        }
+
+        function savePythonPath(path) {
+            localStorage.setItem('pythonPath', path);
+        }
+
+        // Init
+        setTimeout(() => {
+            loadProjects();
+            loadPythonPath();
+        }, 500); // Trigger auto load
+    </script>
+</body>
+
+</html>
