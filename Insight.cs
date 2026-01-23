@@ -111,7 +111,6 @@ namespace Insight
             var debugPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", fileName));
             if (File.Exists(debugPath))
             {
-                System.Diagnostics.Debug.WriteLine($"[Debug] Loading UI from source: {debugPath}");
                 return File.ReadAllText(debugPath);
             }
 #endif
@@ -223,13 +222,11 @@ namespace Insight
                         if (root.TryGetProperty("path", out var modelPathProp))
                         {
                             var modelPath = modelPathProp.GetString();
-                            SendLog($"[Debug] open_model_folder: {modelPath}", "info");
-
                             try
                             {
                                 if (!string.IsNullOrEmpty(modelPath) && File.Exists(modelPath))
                                 {
-                                    SendLog($"[Debug] Opening folder with file selected: {modelPath}", "info");
+                                    // 打开文件夹并选中指定文件
                                     var psi = new System.Diagnostics.ProcessStartInfo
                                     {
                                         FileName = "explorer.exe",
@@ -240,8 +237,8 @@ namespace Insight
                                 }
                                 else if (!string.IsNullOrEmpty(modelPath))
                                 {
+                                    // 文件不存在时，尝试打开其所在目录
                                     var folder = Path.GetDirectoryName(modelPath);
-                                    SendLog($"[Debug] File not found, opening folder: {folder}", "info");
                                     if (Directory.Exists(folder))
                                     {
                                         var psi = new System.Diagnostics.ProcessStartInfo
@@ -254,17 +251,13 @@ namespace Insight
                                     }
                                     else
                                     {
-                                        SendLog($"[Debug] Folder also not found: {folder}", "warning");
+                                        SendError($"目标文件夹不存在: {folder}");
                                     }
-                                }
-                                else
-                                {
-                                    SendLog("[Debug] open_model_folder: path is empty", "warning");
                                 }
                             }
                             catch (Exception ex)
                             {
-                                SendLog($"[Debug] Failed to open folder: {ex.Message}", "error");
+                                SendError($"打开文件夹失败: {ex.Message}");
                             }
                         }
                         break;
@@ -278,7 +271,7 @@ namespace Insight
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"消息处理错误: {ex.Message}");
+                // 记录消息处理异常
                 SendError($"消息交互异常: {ex.Message}");
             }
         }
@@ -433,8 +426,7 @@ namespace Insight
             }
             catch (System.Runtime.InteropServices.ExternalException ex)
             {
-                // COM 异常
-                System.Diagnostics.Debug.WriteLine($"COM异常: {ex.Message}");
+                // COM 异常通常发生在系统资源不足或对话框冲突时
                 MessageBox.Show($"文件夹选择器发生错误，请重试。\n{ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
@@ -746,7 +738,7 @@ namespace Insight
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"JSON 转换错误 {jsonPath}: {ex.Message}");
+                // 忽略个别 JSON 解析错误
             }
         }
 
@@ -898,10 +890,21 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
             SendLog($"训练命令: {command}");
         }
 
+        #region 训练指标跟踪
 
-        // === Training Metrics Tracking ===
+        /// <summary>
+        /// 上一次训练轮次的 Box Loss 值
+        /// </summary>
         private double _lastBoxLoss = 0;
+
+        /// <summary>
+        /// 上一次验证的 mAP@50 值
+        /// </summary>
         private double _lastMap50 = 0;
+
+        /// <summary>
+        /// 上一次验证的 mAP@50-95 值
+        /// </summary>
         private double _lastMap5095 = 0;
 
         private async void HandleStartTraining(JsonElement data)
@@ -1275,7 +1278,6 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
             catch (Exception ex)
             {
                 SendToFrontend(new { action = "default_python_path_loaded", path = @"C:\conda_envs\yolo\python.exe" });
-                System.Diagnostics.Debug.WriteLine($"加载默认路径失败: {ex.Message}");
             }
         }
 
@@ -1335,51 +1337,42 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 if (p.ExitCode == 0)
                 {
                     var exportedOnnx = bestPt.Replace(".pt", ".onnx");
-                    SendLog($"[Debug] Looking for exported ONNX at: {exportedOnnx}", "info");
 
                     if (File.Exists(exportedOnnx))
                     {
-                        SendLog($"[Debug] Found ONNX file, size: {new FileInfo(exportedOnnx).Length / 1024}KB", "info");
+                        var fileSizeKB = new FileInfo(exportedOnnx).Length / 1024;
+                        SendLog($"ONNX 文件已生成，大小: {fileSizeKB}KB", "info");
 
-                        // Determine Target Directory
+                        // 确定目标保存目录
                         string targetDir = string.IsNullOrWhiteSpace(paramsData.ModelStoragePath) ? workDir : paramsData.ModelStoragePath;
-                        SendLog($"[Debug] Target directory: {targetDir}", "info");
-
                         if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
 
-                        // Determine Name
+                        // 确定最终文件名
                         string finalName = paramsData.OnnxName;
                         if (string.IsNullOrWhiteSpace(finalName))
                         {
-                            var modelSize = paramsData.ModelSize; // v8s, v11n etc
+                            var modelSize = paramsData.ModelSize;
                             var dateStr = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                            // Default: yolo-{size}-{date}.onnx
                             finalName = $"yolo-{modelSize}-{dateStr}.onnx";
                         }
                         if (!finalName.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase)) finalName += ".onnx";
 
                         var finalPath = Path.Combine(targetDir, finalName);
-                        SendLog($"[Debug] Moving to: {finalPath}", "info");
-
                         File.Move(exportedOnnx, finalPath, true);
 
-                        // === SAVE METADATA ===
+                        // 保存模型元数据
                         SaveModelMetadata(finalPath, paramsData);
-                        // =====================
 
-                        // === SAVE TRAINING HISTORY ===
-                        // Derive project name from workDir (usually RootPath\dataset, so RootPath is parent)
+                        // 保存训练历史记录
                         var projectName = Path.GetFileName(Path.GetDirectoryName(workDir)) ?? "Unknown";
                         SaveTrainingHistoryEntry(finalPath, paramsData, projectName);
-                        // =============================
 
                         SendLog($"★ 导出成功! 已归档至: {finalPath}", "success");
                         SendToFrontend(new { action = "model_operation_complete" });
                     }
                     else
                     {
-                        SendLog($"[Debug] ONNX file NOT found at expected path: {exportedOnnx}", "warning");
-                        SendLog("导出命令由于未知原因未生成文件。", "warning");
+                        SendLog("导出命令执行完毕但未生成 ONNX 文件，请检查日志。", "warning");
                     }
                 }
                 else
@@ -1414,9 +1407,14 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 SendLog($"元数据保存失败: {ex.Message}", "warning");
             }
         }
+        #endregion
 
-        // === Training History Management ===
+        #region 训练历史管理
 
+        /// <summary>
+        /// 获取训练历史记录文件的存储路径
+        /// </summary>
+        /// <returns>训练历史 JSON 文件的完整路径</returns>
         private string GetTrainingHistoryPath()
         {
             // Store history alongside projects.json
@@ -1502,6 +1500,8 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 SendToFrontend(new { action = "training_history_loaded", history = new List<object>() });
             }
         }
+
+        #endregion
 
 
         private void HandleGetModels(JsonElement data)

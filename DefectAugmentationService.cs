@@ -115,7 +115,7 @@ namespace Insight
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"处理失败 {Path.GetFileName(imgFile)}: {ex.Message}");
+                    // 忽略单张图片处理失败，继续处理下一张
                 }
                 finally
                 {

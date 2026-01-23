@@ -39,7 +39,7 @@ namespace Insight
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading projects: {ex.Message}");
+                // 记录加载失败错误，实际生产环境建议记录到文件日志
                 return new List<ProjectConfig>();
             }
         }
