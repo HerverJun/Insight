@@ -7,91 +7,95 @@
     <title>Insight · 秋毫V4</title>
     <style>
         :root {
-            /* 核心色板 - 雅韵 (Elegant Ink) - 亮色模式 */
+            /* 核心色板 - 雅韵 (Elegant Ink) - 2.0 */
             --primary: #00897B;
-            /* 竹青 (Bamboo Teal) - 沉稳雅致 */
             --primary-light: #4DB6AC;
-            /* 浅竹 (Light Bamboo) */
             --primary-dark: #004D40;
-            /* 深竹 (Deep Bamboo) */
+            --primary-accent: #00BFA5;
+            /* 琉璃青 (Glazed Blue) */
+            --gold-accent: #C9A962;
+            /* 鎏金 (Gold Thread) */
 
-            /* 背景色板 - 宣纸 (Rice Paper) */
-            --bg-body: #F5F7FA;
-            /* 极浅灰白 (Paper White) - 网页背景 */
+            /* Backgrounds */
+            --bg-body: #F4F6F8;
             --bg-card: #FFFFFF;
-            /* 纯白 (Pure White) - 卡片背景 */
-            --bg-card-light: #F0F2F5;
-            /* 浅灰 (Light Grey) - 输入框/次级背景 */
+            --bg-subtle: #F8FAFC;
 
-            /* 文字色板 - 徽墨 (Hui Ink) */
-            --text-main: #263238;
-            /* 墨黑 (Ink Black) - 主文字 */
-            --text-sub: #546E7A;
-            /* 石青 (Stone Blue) - 次级文字 */
+            /* Text */
+            --text-main: #1F2937;
+            /* 墨灰 */
+            --text-sub: #64748B;
+            /* 石板灰 */
+            --text-light: #94A3B8;
 
-            /* 功能色 */
-            --border-color: #E0E0E0;
-            /* 浅灰边框 */
-            --border-glow: rgba(0, 137, 123, 0.05);
-            /* 极淡的青光 */
-            --sidebar-width: 240px;
-            --danger: #D32F2F;
-            /* 丹红 (Cinnabar) */
-            --success: #388E3C;
-            /* 草绿 (Grass) */
-            --warning: #FFA000;
-            /* 藤黄 (Gamboge) */
+            /* Functional */
+            --border-color: #E2E8F0;
+            --border-hover: #CBD5E1;
+            /* 多层彩色阴影系统 */
+            --shadow-sm: 0 1px 2px rgba(0, 137, 123, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 137, 123, 0.05), 0 2px 4px -1px rgba(0, 137, 123, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 137, 123, 0.08), 0 4px 6px -2px rgba(0, 137, 123, 0.04);
+            --shadow-glow: 0 0 20px rgba(0, 137, 123, 0.15);
+
+            --sidebar-width: 260px;
+
+            /* Status */
+            --danger: #EF4444;
+            --success: #10B981;
+            --warning: #F59E0B;
+
+            /* Transitions */
+            --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            /* 优化字体渲染，增强国风质感 */
-            font-family: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+            /* 字体优化 */
+            font-family: "Inter", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
 
         body {
-            background: var(--bg-body);
+            background-color: var(--bg-body);
             color: var(--text-main);
             height: 100vh;
             display: flex;
             overflow: hidden;
-            /* 宣纸纹理感 - 极淡的暖色晕染 */
+            /* 宣纸纹理 + 动态光晕 */
             background-image:
-                radial-gradient(circle at 10% 20%, rgba(0, 137, 123, 0.03) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(0, 77, 64, 0.02) 0%, transparent 40%);
+                radial-gradient(circle at 0% 0%, rgba(0, 137, 123, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(201, 169, 98, 0.05) 0%, transparent 50%),
+                url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='1'/%3E%3Ccircle cx='13' cy='13' r='1'/%3E%3C/g%3E%3C/svg%3E");
         }
 
         /* Sidebar Styles - 简约雅致 (Elegant Simple) */
+        /* Sidebar Styles - 清新层次 (Clean Layer) */
         .sidebar {
             width: var(--sidebar-width);
-            background: #FFFFFF;
-            /* 纯白背景 */
-            border-right: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.5);
             display: flex;
             flex-direction: column;
-            padding: 24px;
+            padding: 32px 24px;
             z-index: 10;
-            /* 柔和的阴影 */
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
-            backdrop-filter: none;
-            /* 移除磨砂，保持清晰 */
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.015);
         }
 
         .brand {
-            font-size: 24px;
-            font-weight: 800;
+            font-size: 22px;
+            font-weight: 700;
             color: var(--primary);
-            margin-bottom: 40px;
+            margin-bottom: 48px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            letter-spacing: -0.5px;
-            /* 移除霓虹发光，改用干净的文字 */
-            text-shadow: none;
+            gap: 12px;
+            letter-spacing: -0.02em;
         }
 
         .nav-menu {
@@ -103,44 +107,57 @@
         .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
-            border-radius: 8px;
+            gap: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.25s var(--ease-out);
             color: var(--text-sub);
-            font-weight: 600;
-            font-size: 15px;
+            font-weight: 500;
+            font-size: 14px;
             background: transparent;
             border: 1px solid transparent;
             position: relative;
-            overflow: hidden;
         }
 
         .nav-item:hover {
-            background: rgba(0, 137, 123, 0.05);
-            /* 极淡的竹青色 */
+            background: rgba(0, 137, 123, 0.04);
             color: var(--primary);
-            /* border-color: rgba(0, 137, 123, 0.1); */
+            transform: translateX(4px);
         }
 
         .nav-item.active {
             background: rgba(0, 137, 123, 0.08);
             color: var(--primary);
-            border: 1px solid transparent;
-            /* 书签样式左侧高亮 */
-            border-left: 3px solid var(--primary);
+            font-weight: 600;
         }
+
+        /* 选中时的左侧指示条 (可选设计，这里用背景色区分已足够，或者加一个小圆点) */
+        /*
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
+        */
 
         .nav-icon {
-            font-size: 18px;
-            color: var(--text-sub);
-            /* 图标默认灰色 */
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            transition: all 0.3s ease;
         }
 
-        .nav-item.active .nav-icon {
-            color: var(--primary);
-            /* 激活时变色 */
+        .nav-item:hover .nav-icon {
+            transform: rotate(5deg);
         }
 
         /* Main Content Area */
@@ -213,17 +230,16 @@
         }
 
         /* Modern Cards - Elegant Style */
+        /* Modern Cards - Elegant Style */
         .card {
-            background: #FFFFFF;
-            /* 纯白卡片 */
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 16px;
             padding: 24px;
-            /* 柔和的墨晕阴影 */
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04),
-                0 1px 4px rgba(0, 0, 0, 0.02);
-            border: 1px solid var(--border-color);
-            /* 清晰的浅灰边框 */
-            transition: all 0.3s ease;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             display: flex;
             flex-direction: column;
             position: relative;
@@ -231,9 +247,9 @@
 
         .card:hover {
             transform: translateY(-2px);
-            border-color: var(--primary-light);
-            box-shadow: 0 8px 24px rgba(0, 137, 123, 0.08);
-            /* 悬停时淡淡的青光 */
+            border-color: rgba(255, 255, 255, 0.9);
+            box-shadow: var(--shadow-lg);
+            background: rgba(255, 255, 255, 0.85);
         }
 
         .card.fill-height {
@@ -277,22 +293,31 @@
 
         .form-control {
             width: 100%;
-            padding: 12px;
+            padding: 12px 14px;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: #F9FAFB;
-            /* 极浅灰背景 */
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.6);
             color: var(--text-main);
             font-size: 14px;
-            transition: all 0.3s ease;
+            transition: all 0.25s ease;
+            font-family: inherit;
         }
 
         .form-control:focus {
             background: #FFFFFF;
             border-color: var(--primary);
             outline: none;
-            box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.1);
-            /* 柔和的对焦光环 */
+            box-shadow: 0 0 0 4px var(--shadow-glow);
+        }
+
+        select.form-control {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            appearance: none;
         }
 
         .input-group {
@@ -323,17 +348,16 @@
         }
 
         .btn-primary {
-            /* 沉稳的竹青色渐变 */
-            background: linear-gradient(145deg, var(--primary), var(--primary-dark));
+            background: linear-gradient(135deg, var(--primary), var(--primary-accent));
             color: #fff;
-            box-shadow: 0 2px 6px rgba(0, 137, 123, 0.2);
-            border: none;
+            box-shadow: 0 4px 12px rgba(0, 137, 123, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .btn-primary:hover {
-            filter: brightness(1.1);
+            filter: brightness(1.05);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 137, 123, 0.3);
+            box-shadow: 0 6px 16px rgba(0, 137, 123, 0.35);
         }
 
         .btn-secondary {
@@ -868,34 +892,127 @@
             opacity: 0.9;
             word-break: break-all;
         }
+
+        /* ========== Phase 5: Animations & Micro-interactions ========== */
+
+        /* 1. View Transitions */
+        @keyframes fadeSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.99);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .view-container.active {
+            animation: fadeSlideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* 2. Staggered Entry Animations */
+        @keyframes staggerReveal {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stagger-item {
+            opacity: 0;
+            /* Initially hidden */
+            animation: staggerReveal 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        /* 3. Enhanced Hover Effects */
+        .btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .checklist-item {
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item:hover {
+            transform: translateX(4px);
+            background: #F0FDF4;
+        }
+
+        .form-control:focus {
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 
 <body>
     <!-- Sidebar Navigation -->
     <div class="sidebar">
-        <div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-                <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" />
-            </svg>Insight · 秋毫V4 </div>
+        <!-- Logo Icon as Linear SVG -->
+        <div class="brand">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            Insight · 秋毫
+        </div>
         <div class="nav-menu">
-            <div class="nav-item active" onclick="switchTab('config')" id="nav-config"><span
-                    class="nav-icon">⚙️</span><span>任务配置</span></div>
-            <div class="nav-item" onclick="switchTab('monitor')" id="nav-monitor"><span
-                    class="nav-icon">📈</span><span>训练监控</span></div>
-            <div class="nav-item" onclick="switchTab('tools')" id="nav-tools"><span
-                    class="nav-icon">🛠️</span><span>数据转换</span></div>
-            <div class="nav-item" onclick="switchTab('models')" id="nav-models"><span
-                    class="nav-icon">📦</span><span>训练历史</span></div>
+            <div class="nav-item active" onclick="switchTab('config')" id="nav-config">
+                <!-- Config Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+                <span>任务配置</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('monitor')" id="nav-monitor">
+                <!-- Monitor/Chart Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <span>训练监控</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('tools')" id="nav-tools">
+                <!-- Tools Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                    </path>
+                </svg>
+                <span>数据转换</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('models')" id="nav-models">
+                <!-- Models/Archive Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+                <span>训练历史</span>
+            </div>
         </div>
         <div style="flex: 1;"></div>
-        <div style="font-size: 12px; color: var(--text-sub); text-align: center; margin-top: 20px;">v2.1.0 Build
-            2025 </div>
+        <div style="font-size: 11px; color: var(--text-light); text-align: center; margin-top: 20px;">v2.1.0</div>
     </div>
     <!-- Main Content -->
     <div class="main-content">
@@ -905,11 +1022,39 @@
                 <!-- Left Column: Data Source Mgmt -->
                 <div class="panel-col">
                     <div class="card fill-height">
-                        <div class="card-header"><span>项目与数据源</span><button class="btn btn-secondary btn-icon"
-                                onclick="loadProjects()" title="刷新项目">🔄</button><button
-                                class="btn btn-primary btn-icon" onclick="openCreateProjectModal()" title="新建项目"
-                                style="margin-left: 8px;">＋</button><button class="btn btn-danger btn-icon"
-                                onclick="deleteProject()" title="删除当前项目" style="margin-left: 8px;">🗑️</button></div>
+                        <div class="card-header">
+                            <span>项目与数据源</span>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-icon" onclick="loadProjects()" title="刷新项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M23 4v6h-6"></path>
+                                        <path d="M1 20v-6h6"></path>
+                                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                        </path>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-primary btn-icon" onclick="openCreateProjectModal()"
+                                    title="新建项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-danger btn-icon" onclick="deleteProject()" title="删除当前项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                        </path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                         <div class="form-group"><label class="form-label">当前项目 (Project)</label><select
                                 id="projectSelect" class="form-control" onchange="onProjectChanged()">
                                 <option value="">正在加载...</option>
@@ -929,8 +1074,20 @@
                 <!-- Right Column: Training Params -->
                 <div class="panel-col">
                     <div class="card">
-                        <div class="card-header"><span>YOLO 训练参数</span><button class="btn btn-secondary"
-                                onclick="openAugmentModal()" style="font-size: 12px;">🛠️ 缺陷增强 </button></div>
+                        <div class="card-header">
+                            <span>YOLO 训练参数</span>
+                            <button class="btn btn-secondary" onclick="openAugmentModal()"
+                                style="font-size: 13px; padding: 6px 12px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <path
+                                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                                    </path>
+                                </svg>
+                                缺陷增强
+                            </button>
+                        </div>
                         <div class="params-grid">
                             <div class="form-group"><label class="form-label">模型大小</label><select id="modelSize"
                                     class="form-control">
@@ -1011,6 +1168,8 @@
                             <div id="statusMessage"
                                 style="text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-sub); height: 20px;">
                             </div>
+                            <!-- Status Grid -->
+
                         </div>
                     </div>
                     <div class="card" style="flex: 0;">
@@ -1021,50 +1180,98 @@
                                     onchange="savePythonPath(this.value)"><button class="btn btn-secondary"
                                     onclick="selectFolder('python')" title="浏览文件夹">📁</button><button
                                     class="btn btn-secondary" onclick="saveAsDefaultPythonPath()" title="保存为默认地址"
-                                    style="margin-left: 4px;">💾 设为默认</button></div>
+                                    style="margin-left: 4px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right: 4px;">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    设为默认
+                                </button></div>
                         </div>
-                        <div style="display: flex; gap: 16px;"><button id="btnStartTrain" class="btn btn-primary"
-                                onclick="startTraining()" style="flex: 2;">🚀 开始训练</button><button id="btnStopTrain"
-                                class="btn btn-danger" onclick="stopTraining()" disabled style="flex: 1;">⏹
-                                停止</button><button id="btnOpenOutput" class="btn btn-secondary"
-                                onclick="openOutputFolder()" style="display: none;">📂 结果</button></div>
+                        <div style="display: flex; gap: 16px;">
+                            <button id="btnStartTrain" class="btn btn-primary" onclick="startTraining()"
+                                style="flex: 2;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                开始训练
+                            </button>
+                            <button id="btnStopTrain" class="btn btn-danger" onclick="stopTraining()" disabled
+                                style="flex: 1;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                </svg>
+                                停止
+                            </button>
+                            <button id="btnOpenOutput" class="btn btn-secondary" onclick="openOutputFolder()"
+                                style="display: none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <path
+                                        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                    </path>
+                                </svg>
+                                结果
+                            </button>
+                        </div>
                     </div>
                     <!-- Layout Optimization: System Status & Mini Log -->
                     <!-- Flex-grow to fill the remaining vertical space -->
                     <div class="card" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                        <div class="card-header"><span>系统状态与日志 (System Status)</span><span
+                        <div class="card-header"><span>系统状态 (System Status)</span><span
                                 style="font-size: 11px; color: var(--text-sub);">Live</span>
                         </div>
                         <!-- Status Grid -->
+                        <!-- Status Grid -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                             <div
-                                style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                                <div style="font-size: 18px;">🐍</div>
-                                <div>
-                                    <div style="font-size: 10px; color: var(--text-sub);">
-                                        Python Environment</div>
-                                    <div style="font-size: 12px; font-weight: 600; color: #0be881;">
-                                        Detected</div>
+                                style="background: rgba(0, 137, 123, 0.04); padding: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(0, 137, 123, 0.1);">
+                                <div
+                                    style="width: 32px; height: 32px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00897B"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M12 19c-4.4 0-8-3.6-8-8 0-4.4 3.6-8 8-8 4.4 0 8 3.6 8 8 0 4.4-3.6 8-8 8z">
+                                        </path>
+                                        <path d="M12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"></path>
+                                    </svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: var(--text-sub); font-weight: 500;">Python
+                                        Env
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--success);">Detected
+                                    </div>
                                 </div>
                             </div>
                             <div
-                                style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                                <div style="font-size: 18px;">🎮</div>
-                                <div>
-                                    <div style="font-size: 10px; color: var(--text-sub);">
-                                        GPU Acceleration</div>
-                                    <div style="font-size: 12px; font-weight: 600; color: #0be881;" id="gpuStatus">
-                                        Ready </div>
+                                style="background: rgba(0, 137, 123, 0.04); padding: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(0, 137, 123, 0.1);">
+                                <div
+                                    style="width: 32px; height: 32px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00897B"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                                    </svg>
                                 </div>
-                            </div>
-                            <!-- More metrics can be added here -->
-                        </div>
-                        <!-- Mini Console -->
-                        <div style="flex: 1; background: #000; border-radius: 6px; padding: 10px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; color: #dcdde1;"
-                            id="configConsole">
-                            <div style="color: #7f8fa4;">>System initialized...
-                            </div>
-                            <div style="color: #7f8fa4;">>Waiting for commands...
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: var(--text-sub); font-weight: 500;">GPU
+                                        Status
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--success);"
+                                        id="gpuStatus">Ready</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1077,20 +1284,56 @@
                 <!-- KPI Cards -->
                 <div class="kpi-row">
                     <div class="kpi-card">
-                        <div class="kpi-title">🔄 Epochs</div>
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
+                            </svg>
+                            Epochs
+                        </div>
                         <div class="kpi-value" id="kpi-epoch">0/0</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">🎯 Box Loss</div>
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d98e84"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            Box Loss
+                        </div>
                         <div class="kpi-value" id="kpi-loss" style="color: #d98e84;">0.00</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">📈 mAP50</div>
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8cb6a8"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                            mAP50
+                        </div>
                         <div class="kpi-value" id="kpi-map50" style="color: #8cb6a8;">0.00</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-title">🚀 mAP50-95</div>
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e6c587"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon
+                                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                                </polygon>
+                            </svg>
+                            mAP50-95
+                        </div>
                         <div class="kpi-value" id="kpi-map95" style="color: #e6c587;">0.00</div>
+                        <div style="position: absolute; right: 20px; bottom: 20px; opacity: 0.1;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e6c587"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 <!-- Main Chart -->
@@ -1193,7 +1436,8 @@
     <!-- Modals -->
     <div id="augmentModal" class="modal">
         <div class="modal-box">
-            <h3 style="margin-bottom: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);">缺陷样本增强
+            <h3 style="margin-bottom: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);">
+                缺陷样本增强
             </h3>
             <div class="form-group"><label class="form-label">源路径 (Source)</label>
                 <div class="input-group"><input type="text" id="augmentSourcePath" class="form-control" readonly><button
@@ -1201,7 +1445,8 @@
             </div>
             <div class="form-group"><label class="form-label">素材路径 (Defect Assets)</label>
                 <div class="input-group"><input type="text" id="holeAssetsPath" class="form-control" readonly><button
-                        class="btn btn-secondary" onclick="selectFolder('holeAssets')">📁</button></div>
+                        class="btn btn-secondary" onclick="selectFolder('holeAssets')">📁</button>
+                </div>
             </div>
             <div class="form-group"><label class="form-label">生成比例: <span id="mutationRateVal">30%</span></label><input
                     type="range" id="mutationRate" style="width: 100%; accent-color: var(--primary);" min="10" max="80"
@@ -1223,7 +1468,13 @@
     <!-- Success Notification Toast -->
     <div id="successToastOverlay" class="success-toast-overlay"></div>
     <div id="successToast" class="success-toast">
-        <div class="success-toast-icon">🎉</div>
+        <div class="success-toast-icon">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
         <div class="success-toast-title" id="successToastTitle">操作完成！</div>
         <div class="success-toast-message" id="successToastMessage">数据集生成已成功完成</div>
         <button class="success-toast-close" onclick="hideSuccessToast()">确定</button>
@@ -1231,21 +1482,36 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script> // ========== Tabs Management ==========
 
-        function switchTab(viewId) {
-            // Update Nav
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('nav-' + viewId).classList.add('active');
-
-            // Update View
-            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
-            document.getElementById('view-' + viewId).classList.add('active');
-
-            if (viewId === 'monitor' && chartInstance) {
-                setTimeout(() => chartInstance.resize(), 100);
+        // Global Error Handler
+        window.addEventListener('error', function (event) {
+            console.error("Global Script Error:", event.error);
+            // Try to notify user if showMiniToast is available
+            if (typeof showMiniToast === 'function') {
+                showMiniToast('error', 'Script Error', event.message || 'Unknown error');
             }
+        });
 
-            if (viewId === 'models') {
-                loadTrainingHistory();
+        function switchTab(viewId) {
+            try {
+                // Update Nav
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                const nav = document.getElementById('nav-' + viewId);
+                if (nav) nav.classList.add('active');
+
+                // Update View
+                document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+                const view = document.getElementById('view-' + viewId);
+                if (view) view.classList.add('active');
+
+                if (viewId === 'monitor' && typeof chartInstance !== 'undefined' && chartInstance) {
+                    setTimeout(() => chartInstance.resize(), 100);
+                }
+
+                if (viewId === 'models') {
+                    if (typeof loadTrainingHistory === 'function') loadTrainingHistory();
+                }
+            } catch (err) {
+                console.error("switchTab error:", err);
             }
         }
 
@@ -1308,18 +1574,17 @@
                 return;
             }
 
-            folders.forEach(folder => {
+            folders.forEach((folder, index) => {
                 const item = document.createElement('div');
-                item.className = 'checklist-item';
+                item.className = 'checklist-item stagger-item';
+                item.style.animationDelay = (index * 0.05) + 's';
 
                 item.onclick = function (e) {
                     if (e.target.type !== 'checkbox') {
                         const cb = item.querySelector('input');
                         cb.checked = !cb.checked;
                     }
-                }
-
-                    ;
+                };
 
                 const inp = document.createElement('input');
                 inp.type = 'checkbox';
@@ -1403,7 +1668,7 @@
             }
 
             else if (data.action === 'training_finished') {
-                showMiniToast('🎉', '训练完成', '模型训练已成功完成！', 'success');
+                showMiniToast('success', '训练完成', '模型训练已成功完成！', 'success');
                 addLog('Training Finished!', 'success');
                 document.getElementById('btnStartTrain').disabled = false;
                 document.getElementById('btnStopTrain').disabled = true;
@@ -1412,7 +1677,7 @@
             }
 
             else if (data.action === 'training_stopped') {
-                showMiniToast('⚠️', '训练已停止', '用户手动停止了训练进程', 'warning');
+                showMiniToast('warning', '训练已停止', '用户手动停止了训练进程', 'warning');
                 addLog('Training Stopped', 'warning');
                 document.getElementById('btnStartTrain').disabled = false;
                 document.getElementById('btnStopTrain').disabled = true;
@@ -1421,12 +1686,12 @@
 
             else if (data.action === 'complete') {
                 // 显示右上角通知
-                showMiniToast('🎉', '操作完成', data.message, 'success');
+                showMiniToast('success', '操作完成', data.message, 'success');
                 addLog(data.message, 'success');
             }
 
             else if (data.action === 'error') {
-                showMiniToast('❌', '出错了', data.message, 'error');
+                showMiniToast('error', '出错了', data.message, 'error');
                 addLog(data.message, 'error');
             }
 
@@ -1436,9 +1701,9 @@
 
             else if (data.action === 'python_path_saved') {
                 if (data.success) {
-                    showMiniToast('✅', '设置成功', '已保存为默认地址，重启后自动生效', 'success');
+                    showMiniToast('success', '设置成功', '已保存为默认地址，重启后自动生效', 'success');
                 } else {
-                    showMiniToast('❌', '保存失败', data.error || '未知错误', 'error');
+                    showMiniToast('error', '保存失败', data.error || '未知错误', 'error');
                 }
             }
 
@@ -1801,7 +2066,7 @@
 
         function startGenerate() {
             if (!currentProjectConfig) {
-                showMiniToast('⚠️', '提示', '请先选择项目', 'warning');
+                showMiniToast('warning', '提示', '请先选择项目', 'warning');
                 return;
             }
 
@@ -1809,7 +2074,7 @@
             const checkboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]:checked');
 
             if (checkboxes.length === 0) {
-                showMiniToast('⚠️', '提示', '请至少勾选一个数据源文件夹', 'warning');
+                showMiniToast('warning', '提示', '请至少勾选一个数据源文件夹', 'warning');
                 return;
             }
 
@@ -1949,9 +2214,11 @@
             // Sort by date descending (newest first)
             entries.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-            entries.forEach(entry => {
+            entries.forEach((entry, index) => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.className = 'stagger-item';
+                tr.style.animationDelay = (index * 0.05) + 's';
 
                 // Project Name
                 const projectName = entry.projectName || 'Unknown';
@@ -1983,22 +2250,19 @@
 
                 // Create button programmatically to avoid escaping issues
                 const modelPath = entry.modelPath || '';
-                console.log("[renderTrainingHistory] Creating button for path:", modelPath);
                 const actionCell = tr.querySelector('.action-cell');
-                console.log("[renderTrainingHistory] Found action cell:", actionCell);
 
                 if (modelPath && actionCell) {
                     const btn = document.createElement('button');
                     btn.className = 'btn btn-secondary btn-icon';
                     btn.title = '打开模型所在文件夹';
-                    btn.textContent = '📂';
-                    // Store path as data attribute
-                    btn.dataset.path = modelPath;
+                    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+
                     btn.onclick = function (e) {
-                        var path = e.target.dataset.path;
+                        // Use proper path from closure
                         window.chrome.webview.postMessage(JSON.stringify({
                             action: 'open_model_folder',
-                            path: path
+                            path: modelPath
                         }));
                     };
                     actionCell.appendChild(btn);
@@ -2061,16 +2325,6 @@
             const tbody = document.getElementById('modelTableBody');
             tbody.innerHTML = '';
 
-            // Update Header if needed (We need to insert header rows dynamically or assume fixed HTML)
-            // Ideally we should update the HTML structure of the table too.
-            // But let's cheat and update the THEAD via JS or just rewrite row content carefully.
-            // Better: Let's assume user accepts I change the THEAD in HTML too. 
-            // I will target the THEAD in a separate edit or just force it here if I can ? 
-            // No, renderModelList only touches TBODY.
-            // I will use a separate replacement for the HTML structure.
-            // For now, let's look at the JS logic assuming the columns are:
-            // Name | Config | Labels | Time | Actions
-
             if (!models || models.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #aaa; padding: 20px;">No models found. Train one to see history!</td></tr>';
                 return;
@@ -2078,38 +2332,45 @@
 
             models.forEach(model => {
                 const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
 
                 // --- Metadata Parsing ---
                 let configStr = '<span style="color:#aaa;">-</span>';
-                let labelsStr = '<span style="color:#aaa;">-</span>';
-                let sizeStr = model.size;
 
                 if (model.metadata && model.metadata.paramsData) {
                     const p = model.metadata.paramsData;
-                    // Format: v8s | 640 | Ep:300 | B:16
-                    configStr = `<span class="badge" style="background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-main); font-family:Consolas;">${p.ModelSize}</span> 
-                                 <span style="color:var(--text-sub); font-size:11px;">${p.ImgSize}px</span>
-                                 <span style="color:var(--text-sub); font-size:11px;">Ep:${p.Epochs}</span>`;
-
-                    // Classes
-                    if (p.Classes && p.Classes.length > 0) {
-                        labelsStr = p.Classes.map(c => `<span class="badge" style="background:rgba(0,210,255,0.1); color:var(--primary); margin-right:4px;">${c}</span>`).join('');
-                    }
+                    configStr = `<span style="background:var(--bg-card); border:1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; color:var(--text-main); font-family:Consolas; font-size: 11px;">${p.ModelSize}</span> 
+                                     <span style="color:var(--text-sub); font-size:11px; margin-left: 4px;">${p.ImgSize}px</span>`;
                 }
 
                 // Name Column (Icon + Name)
-                const nameHtml = `<div style="display:flex; align-items:center; gap:8px;">
-                                    <span style="font-size:16px;">📦</span>
+                const typeBadge = `<div style="display:flex; align-items:center; gap:8px;">
+                                    <div style="width: 32px; height: 32px; background: rgba(0, 137, 123, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00897B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                    </div>
                                     <div>
-                                        <div style="font-weight:bold; font-size:13px;">${model.name}</div>
-                                        <div style="font-size:11px; color:#aaa;">${model.size}</div>
+                                        <div style="font-weight:bold; font-size:13px; color: var(--text-main);">${model.name}</div>
+                                        <div style="font-size:11px; color: var(--text-light);">${model.size}</div>
                                     </div>
                                   </div>`;
 
+                // Actions
+                const actions = `
+                        <button class="btn btn-secondary btn-icon" title="重命名" onclick="renameModel('${model.name}')" style="padding:6px; width: 32px; height: 32px;">
+                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="btn btn-danger btn-icon" title="删除" onclick="deleteModel('${model.name}')" style="padding:6px; width: 32px; height: 32px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" title="转换" onclick="convertModel('${model.name}')" style="padding:6px; width: 32px; height: 32px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                    `;
+
                 tr.innerHTML = `
                     <td style="padding: 12px;">${typeBadge}</td>
-                    <td style="padding: 12px;">${model.size}</td>
-                    <td style="padding: 12px;">${model.date}</td>
+                    <td style="padding: 12px; font-size: 13px;">${configStr}</td>
+                    <td style="padding: 12px; font-size: 12px; color: var(--text-sub);">${model.date}</td>
                     <td style="padding: 12px; text-align: right; display:flex; gap:6px; justify-content:flex-end;">${actions}</td>
                 `;
                 tbody.appendChild(tr);
@@ -2183,7 +2444,7 @@
             const classes = document.getElementById('newProjectClasses').value;
 
             if (!name || !root) {
-                showMiniToast('⚠️', '提示', '项目名称和根目录不能为空', 'warning');
+                showMiniToast('warning', '提示', '项目名称和根目录不能为空');
                 return;
             }
 
@@ -2243,7 +2504,7 @@
             const tgt = document.getElementById('toolTargetPath').value;
 
             if (!src || !tgt) {
-                showMiniToast('⚠️', '提示', '请先选择源文件夹和目标路径', 'warning');
+                showMiniToast('warning', '提示', '请先选择源文件夹和目标路径');
                 return;
             }
 
@@ -2274,7 +2535,7 @@
         function saveAsDefaultPythonPath() {
             var currentPath = document.getElementById('pythonPath').value;
             if (!currentPath || currentPath.trim() === '') {
-                showMiniToast('⚠️', '设置失败', '请先输入有效的 Python 环境路径', 'warning');
+                showMiniToast('warning', '设置失败', '请先输入有效的 Python 环境路径');
                 return;
             }
             // 通过后端保存为默认地址
@@ -2284,30 +2545,47 @@
             }));
         }
 
-        function showMiniToast(icon, title, message, type) {
-            // 移除旧的 toast
+        function showMiniToast(type, title, message) {
+            // Remove old toast
             var oldToast = document.querySelector('.mini-toast');
             if (oldToast) oldToast.remove();
 
-            // 创建新的 toast
+            // Determine Icon & Color
+            var iconSvg = '';
+            var bg = '';
+
+            if (type === 'success') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+                bg = 'linear-gradient(135deg, #00897B, #26A69A)';
+            } else if (type === 'warning') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+                bg = 'linear-gradient(135deg, #FF9800, #F57C00)';
+            } else if (type === 'error') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+                bg = 'linear-gradient(135deg, #E53935, #C62828)';
+            } else {
+                // Info / Default
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+                bg = 'linear-gradient(135deg, #455A64, #607D8B)';
+            }
+
+            // Create new toast
             var toast = document.createElement('div');
             toast.className = 'mini-toast';
-            if (type === 'error') {
-                toast.style.background = 'linear-gradient(135deg, #E53935, #EF5350)';
-            } else if (type === 'warning') {
-                toast.style.background = 'linear-gradient(135deg, #FB8C00, #FFA726)';
-            }
-            toast.innerHTML = '<div class="mini-toast-icon">' + icon + '</div>' +
+            toast.style.background = bg;
+
+            toast.innerHTML = '<div class="mini-toast-icon">' + iconSvg + '</div>' +
                 '<div class="mini-toast-content">' +
                 '<div class="mini-toast-title">' + title + '</div>' +
                 '<div class="mini-toast-message">' + message + '</div>' +
                 '</div>';
+
             document.body.appendChild(toast);
 
-            // 显示动画
+            // Animation
             setTimeout(function () { toast.classList.add('show'); }, 50);
 
-            // 3秒后自动消失
+            // Auto Dismiss
             setTimeout(function () {
                 toast.classList.remove('show');
                 setTimeout(function () { toast.remove(); }, 400);
