@@ -268,6 +268,12 @@ namespace Insight
                             }
                         }
                         break;
+                    case "save_default_python_path":
+                        HandleSaveDefaultPythonPath(root);
+                        break;
+                    case "get_default_python_path":
+                        HandleGetDefaultPythonPath();
+                        break;
                 }
             }
             catch (Exception ex)
@@ -827,7 +833,9 @@ head:
   - [[18, 21, 24, 27], 1, Detect, [nc]]  # Detect(P2, P3, P4, P5)
 ";
             // 解析模型版本和大小
-            var modelVersion = modelSize.StartsWith("v11") ? "yolo11" : "yolov8";
+            var modelVersion = modelSize.StartsWith("v26") ? "yolo26"
+                             : modelSize.StartsWith("v11") ? "yolo11"
+                             : "yolov8";
             var sizeCode = modelSize.Length > 2 ? modelSize.Substring(modelSize.Length - 1) : modelSize;
             var fileName = $"{modelVersion}{sizeCode}-p2.yaml";
             File.WriteAllText(Path.Combine(targetPath, fileName), yamlContent);
@@ -837,7 +845,9 @@ head:
         private void GenerateTrainCommand(string targetPath, TrainingParams p)
         {
             // 解析模型版本和大小 (v8s -> yolov8s, v11m -> yolo11m)
-            var modelVersion = p.ModelSize.StartsWith("v11") ? "yolo11" : "yolov8";
+            var modelVersion = p.ModelSize.StartsWith("v26") ? "yolo26"
+                             : p.ModelSize.StartsWith("v11") ? "yolo11"
+                             : "yolov8";
             var sizeCode = p.ModelSize.Length > 2 ? p.ModelSize.Substring(p.ModelSize.Length - 1) : "s";
             var modelName = p.EnableP2 ? $"{modelVersion}{sizeCode}-p2.yaml" : $"{modelVersion}{sizeCode}.pt";
             var dataYamlPath = Path.Combine(targetPath, "data.yaml").Replace("\\", "/");
@@ -1201,6 +1211,76 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
         #endregion
 
+        #region Python 路径配置
+
+        private string GetPythonConfigPath()
+        {
+            var appDir = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(appDir, "python_config.json");
+        }
+
+        private void HandleSaveDefaultPythonPath(JsonElement data)
+        {
+            try
+            {
+                if (data.TryGetProperty("path", out var pathProp))
+                {
+                    var pythonPath = pathProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(pythonPath))
+                    {
+                        var configPath = GetPythonConfigPath();
+                        var config = new { defaultPythonPath = pythonPath };
+                        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(configPath, json);
+
+                        SendToFrontend(new { action = "python_path_saved", success = true, path = pythonPath });
+                        SendLog($"默认 Python 路径已保存: {pythonPath}", "success");
+                    }
+                    else
+                    {
+                        SendToFrontend(new { action = "python_path_saved", success = false, error = "路径为空" });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "python_path_saved", success = false, error = ex.Message });
+                SendError($"保存默认路径失败: {ex.Message}");
+            }
+        }
+
+        private void HandleGetDefaultPythonPath()
+        {
+            try
+            {
+                var configPath = GetPythonConfigPath();
+                string defaultPath = @"C:\conda_envs\yolo\python.exe"; // 代码中的初始默认值
+
+                if (File.Exists(configPath))
+                {
+                    var json = File.ReadAllText(configPath);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("defaultPythonPath", out var pathProp))
+                    {
+                        var savedPath = pathProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(savedPath))
+                        {
+                            defaultPath = savedPath;
+                        }
+                    }
+                }
+
+                SendToFrontend(new { action = "default_python_path_loaded", path = defaultPath });
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "default_python_path_loaded", path = @"C:\conda_envs\yolo\python.exe" });
+                System.Diagnostics.Debug.WriteLine($"加载默认路径失败: {ex.Message}");
+            }
+        }
+
+        #endregion
+
         private void ExportOnnx(string pythonPath, string workDir, string trainArgs, TrainingParams paramsData)
         {
             var bestPt = Path.Combine(workDir, "runs", "detect", "train", "weights", "best.pt");
@@ -1457,12 +1537,12 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                             var jsonStr = File.ReadAllText(jsonPath);
                             var metaObj = JsonDocument.Parse(jsonStr);
                             metadataVal = metaObj.RootElement; // Send raw JsonElement to frontend (System.Text.Json supports this serialization?)
-                            // Actually it's better to deserialize to object or dynamic, but JsonElement serializes fine in object usually.
-                            // Let's manually parse common fields if needed, or just pass the whole thing.
-                            // To avoid serialization issues with JsonElement in some older .NET, let's just pass the string or deserialized dict.
-                            // But usually anonymous object is fine. 
-                            // Let's use deserialized anonymous object or JsonNode (if available).
-                            // Simplest: just pass the Parsed RootElement.
+                                                               // Actually it's better to deserialize to object or dynamic, but JsonElement serializes fine in object usually.
+                                                               // Let's manually parse common fields if needed, or just pass the whole thing.
+                                                               // To avoid serialization issues with JsonElement in some older .NET, let's just pass the string or deserialized dict.
+                                                               // But usually anonymous object is fine. 
+                                                               // Let's use deserialized anonymous object or JsonNode (if available).
+                                                               // Simplest: just pass the Parsed RootElement.
                         }
                         catch { }
                     }
@@ -1569,7 +1649,7 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 string pythonPath = data.TryGetProperty("pythonPath", out var pyEl) ? pyEl.GetString() : "";
                 if (string.IsNullOrWhiteSpace(pythonPath))
                 {
-                    pythonPath = @"C:\ANACONDA\python.exe"; // Fallback
+                    pythonPath = @"C:\conda_envs\yolo\python.exe"; // Fallback
                 }
 
                 SendLog("开始手动转换...", "info");

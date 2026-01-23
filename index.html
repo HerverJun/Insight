@@ -825,6 +825,49 @@
             background: rgba(0, 137, 123, 0.03);
             /* 极淡的青色悬停 */
         }
+
+        /* Mini Toast - 右上角通知栏 */
+        .mini-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #00897B, #26A69A);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 24px rgba(0, 137, 123, 0.3);
+            transform: translateX(120%);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-width: 400px;
+        }
+
+        .mini-toast.show {
+            transform: translateX(0);
+        }
+
+        .mini-toast-icon {
+            font-size: 24px;
+        }
+
+        .mini-toast-content {
+            flex: 1;
+        }
+
+        .mini-toast-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .mini-toast-message {
+            font-size: 12px;
+            opacity: 0.9;
+            word-break: break-all;
+        }
     </style>
 </head>
 
@@ -902,6 +945,13 @@
                                         <option value="v11s">Small (v11s)</option>
                                         <option value="v11m">Medium (v11m)</option>
                                     </optgroup>
+                                    <optgroup label="YOLO26">
+                                        <option value="v26n">Nano (v26n)</option>
+                                        <option value="v26s">Small (v26s)</option>
+                                        <option value="v26m">Medium (v26m)</option>
+                                        <option value="v26l">Large (v26l)</option>
+                                        <option value="v26x">X-Large (v26x)</option>
+                                    </optgroup>
                                 </select></div>
                             <div class="form-group"><label class="form-label">图片尺寸
                                     (ImgSz)</label><input type="number" id="imgSize" class="form-control" value="640"
@@ -967,9 +1017,11 @@
                         <div class="card-header"><span>执行控制</span></div>
                         <div class="form-group">
                             <div class="input-group"><input type="text" id="pythonPath" class="form-control"
-                                    value="C:\ANACONDA\python.exe" placeholder="Python Environment Path..."
+                                    value="C:\conda_envs\yolo\python.exe" placeholder="Python Environment Path..."
                                     onchange="savePythonPath(this.value)"><button class="btn btn-secondary"
-                                    onclick="selectFolder('python')">📁</button></div>
+                                    onclick="selectFolder('python')" title="浏览文件夹">📁</button><button
+                                    class="btn btn-secondary" onclick="saveAsDefaultPythonPath()" title="保存为默认地址"
+                                    style="margin-left: 4px;">💾 设为默认</button></div>
                         </div>
                         <div style="display: flex; gap: 16px;"><button id="btnStartTrain" class="btn btn-primary"
                                 onclick="startTraining()" style="flex: 2;">🚀 开始训练</button><button id="btnStopTrain"
@@ -1351,6 +1403,7 @@
             }
 
             else if (data.action === 'training_finished') {
+                showMiniToast('🎉', '训练完成', '模型训练已成功完成！', 'success');
                 addLog('Training Finished!', 'success');
                 document.getElementById('btnStartTrain').disabled = false;
                 document.getElementById('btnStopTrain').disabled = true;
@@ -1359,6 +1412,7 @@
             }
 
             else if (data.action === 'training_stopped') {
+                showMiniToast('⚠️', '训练已停止', '用户手动停止了训练进程', 'warning');
                 addLog('Training Stopped', 'warning');
                 document.getElementById('btnStartTrain').disabled = false;
                 document.getElementById('btnStopTrain').disabled = true;
@@ -1366,17 +1420,32 @@
             }
 
             else if (data.action === 'complete') {
-                // 显示醒目的完成通知
-                showSuccessToast(data.message);
+                // 显示右上角通知
+                showMiniToast('🎉', '操作完成', data.message, 'success');
                 addLog(data.message, 'success');
             }
 
             else if (data.action === 'error') {
+                showMiniToast('❌', '出错了', data.message, 'error');
                 addLog(data.message, 'error');
             }
 
             else if (data.action === 'training_history_loaded') {
                 renderTrainingHistory(data.history || []);
+            }
+
+            else if (data.action === 'python_path_saved') {
+                if (data.success) {
+                    showMiniToast('✅', '设置成功', '已保存为默认地址，重启后自动生效', 'success');
+                } else {
+                    showMiniToast('❌', '保存失败', data.error || '未知错误', 'error');
+                }
+            }
+
+            else if (data.action === 'default_python_path_loaded') {
+                if (data.path) {
+                    document.getElementById('pythonPath').value = data.path;
+                }
             }
         });
 
@@ -1493,23 +1562,31 @@
 
                             type: 'linear', display: true, position: 'right',
                             title: {
-                                display: true, text: 'Metric', color: '#8cb6a8', font: {
+                                display: true, text: 'mAP', color: '#8cb6a8', font: {
                                     size: 11, weight: 'bold'
                                 }
                             }
 
                             ,
                             ticks: {
-                                color: '#8cb6a8'
+                                color: '#8cb6a8',
+                                // 自定义刻度：0.7, 0.8, 0.85, 0.9, 0.95, 1.0
+                                callback: function (value) {
+                                    return value.toFixed(2);
+                                },
+                                stepSize: 0.05
                             }
 
                             ,
                             grid: {
-                                display: false
+                                display: true,
+                                color: 'rgba(140, 182, 168, 0.1)'
                             }
 
                             ,
-                            min: 0, max: 1
+                            min: 0.7, max: 1.0,
+                            // 动态调整范围（可选）
+                            suggestedMin: 0.7
                         }
                     }
                 }
@@ -1521,46 +1598,90 @@
         function updateChart(epoch, boxLoss, map50, map5095) {
             if (!chartInstance) return;
 
-            // New epoch logic (simplistic)
-            // If label exists, update it? No, just push for now mostly, or replace if last was 'val'
-            // For simplicity here, just Push.
-            if (epoch === '1/...') {
-                // Reset
-                chartInstance.data.labels = [];
-                chartInstance.data.datasets.forEach(d => d.data = []);
+            // 重置图表（新训练开始时）
+            if (epoch === '1/...' || (typeof epoch === 'string' && epoch.startsWith('1/'))) {
+                if (chartInstance.data.labels.length > 100) {
+                    // 如果数据点太多，只保留最近的数据以优化性能
+                    chartInstance.data.labels = [];
+                    chartInstance.data.datasets.forEach(d => d.data = []);
+                }
             }
 
-            // If we receive "3/300", we parse it for display, but for chart we just push
-            // But we need to handle duplicates/updates.
+            // 处理验证结果 (mAP 数据)
+            if (epoch === 'val') {
+                // mAP 数据更新最后一个数据点的对应值，或者追加到最新位置
+                var len = chartInstance.data.datasets[1].data.length;
+                var labelLen = chartInstance.data.labels.length;
 
-            // Just push for execution speed
-            chartInstance.data.labels.push(epoch);
-            chartInstance.data.datasets[0].data.push(boxLoss);
+                if (map50 !== undefined) {
+                    // 更新或填充 mAP50 数据到当前位置
+                    while (chartInstance.data.datasets[1].data.length < labelLen) {
+                        // 用前一个值填充，避免曲线断裂
+                        var prevVal = chartInstance.data.datasets[1].data.length > 0
+                            ? chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1]
+                            : null;
+                        chartInstance.data.datasets[1].data.push(prevVal);
+                    }
+                    // 更新最后一个值
+                    if (chartInstance.data.datasets[1].data.length > 0) {
+                        chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1] = map50;
+                    } else {
+                        chartInstance.data.datasets[1].data.push(map50);
+                    }
+                    document.getElementById('kpi-map50').innerText = map50.toFixed(3);
+                }
 
-            if (map50 !== undefined) {
-                chartInstance.data.datasets[1].data.push(map50);
-                document.getElementById('kpi-map50').innerText = map50.toFixed(3);
-            }
+                if (map5095 !== undefined) {
+                    // 更新或填充 mAP50-95 数据到当前位置
+                    while (chartInstance.data.datasets[2].data.length < labelLen) {
+                        var prevVal = chartInstance.data.datasets[2].data.length > 0
+                            ? chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1]
+                            : null;
+                        chartInstance.data.datasets[2].data.push(prevVal);
+                    }
+                    if (chartInstance.data.datasets[2].data.length > 0) {
+                        chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1] = map5095;
+                    } else {
+                        chartInstance.data.datasets[2].data.push(map5095);
+                    }
+                    document.getElementById('kpi-map95').innerText = map5095.toFixed(3);
+                }
+            } else {
+                // 处理训练数据 (Box Loss)
+                chartInstance.data.labels.push(epoch);
+                chartInstance.data.datasets[0].data.push(boxLoss);
 
-            else {
-                // If map50 comes in a separate event, we might need logic to align. 
-                // But typically it comes same time or we hold. 
-                // For simplified flow, we just duplicate previous if missing or push null.
-                // Actually in 'updateChart' calls from C#, 'val' events send map50/map5095.
-                // We need to handle map50/95 updating KPI.
-            }
+                // 为 mAP 曲线填充 null 占位（等待验证数据）
+                // 使用前一个值来保持曲线连续
+                var prevMap50 = chartInstance.data.datasets[1].data.length > 0
+                    ? chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1]
+                    : null;
+                var prevMap5095 = chartInstance.data.datasets[2].data.length > 0
+                    ? chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1]
+                    : null;
+                chartInstance.data.datasets[1].data.push(prevMap50);
+                chartInstance.data.datasets[2].data.push(prevMap5095);
 
-            if (map5095 !== undefined) {
-                chartInstance.data.datasets[2].data.push(map5095);
-                document.getElementById('kpi-map95').innerText = map5095.toFixed(3);
-            }
-
-            chartInstance.update();
-
-            // KPI Updates
-            if (epoch !== 'val') {
+                // KPI Updates
                 document.getElementById('kpi-epoch').innerText = epoch;
                 if (boxLoss) document.getElementById('kpi-loss').innerText = boxLoss.toFixed(4);
+            }
+
+            // 性能优化：限制数据点数量，超过500点时抽样显示
+            if (chartInstance.data.labels.length > 500) {
+                // 每隔5个点保留一个
+                var step = 5;
+                chartInstance.data.labels = chartInstance.data.labels.filter((_, i) => i % step === 0 || i === chartInstance.data.labels.length - 1);
+                chartInstance.data.datasets.forEach(d => {
+                    d.data = d.data.filter((_, i) => i % step === 0 || i === d.data.length - 1);
+                });
+            }
+
+            // 节流更新：每10次调用只更新一次图表，减少性能开销
+            if (!window._chartUpdateCounter) window._chartUpdateCounter = 0;
+            window._chartUpdateCounter++;
+            if (window._chartUpdateCounter % 5 === 0 || epoch === 'val') {
+                chartInstance.update('none'); // 'none' 模式禁用动画，提高性能
             }
         }
 
@@ -1680,7 +1801,7 @@
 
         function startGenerate() {
             if (!currentProjectConfig) {
-                alert('请先选择项目');
+                showMiniToast('⚠️', '提示', '请先选择项目', 'warning');
                 return;
             }
 
@@ -1688,7 +1809,7 @@
             const checkboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]:checked');
 
             if (checkboxes.length === 0) {
-                alert('请至少勾选一个数据源文件夹');
+                showMiniToast('⚠️', '提示', '请至少勾选一个数据源文件夹', 'warning');
                 return;
             }
 
@@ -2062,7 +2183,7 @@
             const classes = document.getElementById('newProjectClasses').value;
 
             if (!name || !root) {
-                alert('项目名称和根目录不能为空');
+                showMiniToast('⚠️', '提示', '项目名称和根目录不能为空', 'warning');
                 return;
             }
 
@@ -2122,7 +2243,7 @@
             const tgt = document.getElementById('toolTargetPath').value;
 
             if (!src || !tgt) {
-                alert('请先选择源文件夹和目标路径');
+                showMiniToast('⚠️', '提示', '请先选择源文件夹和目标路径', 'warning');
                 return;
             }
 
@@ -2137,15 +2258,60 @@
         }
 
         // ========== Python Path Persistence ==========
+        const DEFAULT_PYTHON_PATH = 'C:\\conda_envs\\yolo\\python.exe';
+
         function loadPythonPath() {
-            const savedPath = localStorage.getItem('pythonPath');
-            if (savedPath) {
-                document.getElementById('pythonPath').value = savedPath;
-            }
+            // 请求后端加载默认路径
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_default_python_path'
+            }));
         }
 
         function savePythonPath(path) {
-            localStorage.setItem('pythonPath', path);
+            // 临时保存（可选，目前不做持久化）
+        }
+
+        function saveAsDefaultPythonPath() {
+            var currentPath = document.getElementById('pythonPath').value;
+            if (!currentPath || currentPath.trim() === '') {
+                showMiniToast('⚠️', '设置失败', '请先输入有效的 Python 环境路径', 'warning');
+                return;
+            }
+            // 通过后端保存为默认地址
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'save_default_python_path',
+                path: currentPath
+            }));
+        }
+
+        function showMiniToast(icon, title, message, type) {
+            // 移除旧的 toast
+            var oldToast = document.querySelector('.mini-toast');
+            if (oldToast) oldToast.remove();
+
+            // 创建新的 toast
+            var toast = document.createElement('div');
+            toast.className = 'mini-toast';
+            if (type === 'error') {
+                toast.style.background = 'linear-gradient(135deg, #E53935, #EF5350)';
+            } else if (type === 'warning') {
+                toast.style.background = 'linear-gradient(135deg, #FB8C00, #FFA726)';
+            }
+            toast.innerHTML = '<div class="mini-toast-icon">' + icon + '</div>' +
+                '<div class="mini-toast-content">' +
+                '<div class="mini-toast-title">' + title + '</div>' +
+                '<div class="mini-toast-message">' + message + '</div>' +
+                '</div>';
+            document.body.appendChild(toast);
+
+            // 显示动画
+            setTimeout(function () { toast.classList.add('show'); }, 50);
+
+            // 3秒后自动消失
+            setTimeout(function () {
+                toast.classList.remove('show');
+                setTimeout(function () { toast.remove(); }, 400);
+            }, 3000);
         }
 
         // Init
