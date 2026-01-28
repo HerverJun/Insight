@@ -2186,11 +2186,14 @@
                             ,
                             ticks: {
                                 color: '#8cb6a8',
-                                // 自定义刻度：0.7, 0.8, 0.85, 0.9, 0.95, 1.0
                                 callback: function (value) {
-                                    return value.toFixed(2);
-                                },
-                                stepSize: 0.05
+                                    // 只显示特定刻度值
+                                    const showTicks = [0, 0.3, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
+                                    if (showTicks.includes(value)) {
+                                        return value.toFixed(2);
+                                    }
+                                    return '';
+                                }
                             }
 
                             ,
@@ -2200,9 +2203,12 @@
                             }
 
                             ,
-                            min: 0.7, max: 1.0,
-                            // 动态调整范围（可选）
-                            suggestedMin: 0.7
+                            min: 0, max: 1,
+                            afterBuildTicks: function (axis) {
+                                // 强制使用自定义非线性刻度
+                                axis.ticks = [0, 0.3, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
+                                    .map(v => ({ value: v }));
+                            }
                         }
                     }
                 }
