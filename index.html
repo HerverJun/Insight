@@ -2065,6 +2065,7 @@
         });
 
         // ========== Chart Logic ==========
+        const CHART_MAX_POINTS = 100; // 环形缓冲区容量：只显示最近 100 个数据点
         var chartInstance = null;
         var trainStartTime = 0;
 
@@ -2215,11 +2216,9 @@
 
             // 重置图表（新训练开始时）
             if (epoch === '1/...' || (typeof epoch === 'string' && epoch.startsWith('1/'))) {
-                if (chartInstance.data.labels.length > 100) {
-                    // 如果数据点太多，只保留最近的数据以优化性能
-                    chartInstance.data.labels = [];
-                    chartInstance.data.datasets.forEach(d => d.data = []);
-                }
+                // 新训练开始，清空所有数据
+                chartInstance.data.labels = [];
+                chartInstance.data.datasets.forEach(d => d.data = []);
             }
 
             // 处理验证结果 (mAP 数据)
@@ -2282,21 +2281,17 @@
                 if (boxLoss) document.getElementById('kpi-loss').innerText = boxLoss.toFixed(4);
             }
 
-            // 性能优化：限制数据点数量，超过500点时抽样显示
-            if (chartInstance.data.labels.length > 500) {
-                // 每隔5个点保留一个
-                var step = 5;
-                chartInstance.data.labels = chartInstance.data.labels.filter((_, i) => i % step === 0 || i === chartInstance.data.labels.length - 1);
-                chartInstance.data.datasets.forEach(d => {
-                    d.data = d.data.filter((_, i) => i % step === 0 || i === d.data.length - 1);
-                });
+            // 环形缓冲区：超过 CHART_MAX_POINTS 时，删除最老的点
+            while (chartInstance.data.labels.length > CHART_MAX_POINTS) {
+                chartInstance.data.labels.shift();
+                chartInstance.data.datasets.forEach(d => d.data.shift());
             }
 
-            // 节流更新：每10次调用只更新一次图表，减少性能开销
+            // 节流更新：每 10 次调用更新一次图表，减少性能开销
             if (!window._chartUpdateCounter) window._chartUpdateCounter = 0;
             window._chartUpdateCounter++;
-            if (window._chartUpdateCounter % 5 === 0 || epoch === 'val') {
-                chartInstance.update('none'); // 'none' 模式禁用动画，提高性能
+            if (window._chartUpdateCounter % 10 === 0 || epoch === 'val') {
+                chartInstance.update('none'); // 'none' 模式禁用动画
             }
         }
 
