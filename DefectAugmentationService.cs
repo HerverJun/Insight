@@ -65,7 +65,7 @@ namespace Insight
 
             // 扫描类别定义
             logger("正在扫描类别定义...");
-            var classMap = ScanClasses(sourceLabelsDir);
+            var classMap = ScanClasses(sourceLabelsDir, logger);
 
             // 扫描源文件
             var imageFiles = Directory.GetFiles(sourceImagesDir)
@@ -115,7 +115,8 @@ namespace Insight
                 }
                 catch (Exception ex)
                 {
-                    // 忽略单张图片处理失败，继续处理下一张
+                    // 记录错误但继续处理下一张
+                    logger($"[警告] 处理 {Path.GetFileName(imgFile)} 时出错: {ex.Message}");
                 }
                 finally
                 {
@@ -131,11 +132,26 @@ namespace Insight
         }
 
         /// <summary>
-        /// 扫描目录中的 LabelMe JSON 文件，提取所有类别名称
+        /// 扫描目录中的标签文件，提取所有类别名称
+        /// 支持: LabelMe JSON, classes.txt, data.yaml, YOLO TXT
         /// </summary>
-        private static Dictionary<string, int> ScanClasses(string dir)
+        private static Dictionary<string, int> ScanClasses(string dir, Action<string> logger)
         {
             var classes = new HashSet<string>();
+
+            // 优先级1: classes.txt 文件 (YOLO 标准格式)
+            var classesFile = Path.Combine(dir, "classes.txt");
+            if (File.Exists(classesFile))
+            {
+                var lines = File.ReadAllLines(classesFile).Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                if (lines.Length > 0)
+                {
+                    logger($"从 classes.txt 读取到 {lines.Length} 个类别");
+                    return lines.Select((name, i) => new { name = name.Trim(), i }).ToDictionary(x => x.name, x => x.i);
+                }
+            }
+
+            // 优先级2: LabelMe JSON 文件
             var jsonFiles = Directory.GetFiles(dir, "*.json");
             foreach (var f in jsonFiles.Take(1000))
             {
@@ -146,13 +162,47 @@ namespace Insight
                     {
                         foreach (var s in shapes.EnumerateArray())
                         {
-                            if (s.TryGetProperty("label", out var l)) classes.Add(l.GetString()!);
+                            if (s.TryGetProperty("label", out var l) && l.GetString() != null)
+                                classes.Add(l.GetString()!);
                         }
                     }
                 }
                 catch { }
             }
-            return classes.OrderBy(x => x).Select((name, i) => new { name, i }).ToDictionary(x => x.name, x => x.i);
+
+            if (classes.Count > 0)
+            {
+                logger($"从 JSON 文件扫描到 {classes.Count} 个类别");
+                return classes.OrderBy(x => x).Select((name, i) => new { name, i }).ToDictionary(x => x.name, x => x.i);
+            }
+
+            // 优先级3: 从 YOLO TXT 文件中自动发现 class_id 并生成占位类别名
+            var txtFiles = Directory.GetFiles(dir, "*.txt").Where(f => !f.EndsWith("classes.txt")).ToArray();
+            var classIds = new HashSet<int>();
+            foreach (var f in txtFiles.Take(1000))
+            {
+                try
+                {
+                    foreach (var line in File.ReadAllLines(f))
+                    {
+                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 5 && int.TryParse(parts[0], out int cid))
+                        {
+                            classIds.Add(cid);
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (classIds.Count > 0)
+            {
+                logger($"从 TXT 文件发现 {classIds.Count} 个类别ID，自动生成类别名");
+                return classIds.OrderBy(x => x).ToDictionary(x => $"class_{x}", x => x);
+            }
+
+            logger("[警告] 未找到任何类别定义");
+            return new Dictionary<string, int>();
         }
 
         /// <summary>
@@ -211,8 +261,11 @@ namespace Insight
                         }
                     }
                 }
-                catch { }
-                return result;
+                catch (Exception ex)
+                {
+                    // JSON 解析失败，尝试回退到 TXT
+                }
+                if (result.Count > 0) return result;
             }
 
             if (File.Exists(txtPath))

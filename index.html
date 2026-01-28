@@ -956,6 +956,189 @@
         .form-control:focus {
             transform: translateY(-1px);
         }
+
+        /* Labeling View Styles */
+        .labeling-layout {
+            display: flex;
+            gap: 16px;
+            height: 100%;
+        }
+
+        .labeling-sidebar {
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .labeling-panel {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .labeling-canvas-area {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .labeling-toolbar {
+            height: 50px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 5;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            /* cursor: crosshair; set dynamicaly */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e0e0e0;
+            background-image:
+                linear-gradient(45deg, #ccc 25%, transparent 25%),
+                linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ccc 75%),
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        #labelingCanvas {
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+            /* canvas size handled by js */
+        }
+
+        .image-list-container {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .image-list-item {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-sub);
+            transition: all 0.2s;
+        }
+
+        .image-list-item:hover {
+            background: rgba(0, 137, 123, 0.05);
+            color: var(--primary);
+        }
+
+        .image-list-item.active {
+            background: rgba(0, 137, 123, 0.1);
+            color: var(--primary-dark);
+            font-weight: 600;
+            border-left: 3px solid var(--primary);
+        }
+
+        .image-list-item.done .status-icon {
+            color: var(--success);
+        }
+
+        .label-chip {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #FFFFFF;
+            margin-bottom: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            justify-content: space-between;
+        }
+
+        .label-chip:hover {
+            border-color: var(--border-hover);
+            transform: translateX(2px);
+        }
+
+        .label-chip.active {
+            border-color: var(--primary);
+            background: #E0F2F1;
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+
+        .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .toolbar-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 137, 123, 0.3);
+        }
+
+        .toolbar-info {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-light);
+            font-family: Consolas, monospace;
+        }
+
+        .toolbar-sep {
+            width: 1px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.1);
+            margin: 0 4px;
+        }
+
+        .shortcut-hint {
+            opacity: 0.6;
+            font-size: 11px;
+            margin-left: 4px;
+        }
     </style>
 </head>
 
@@ -999,6 +1182,16 @@
                     </path>
                 </svg>
                 <span>数据转换</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('labeling')" id="nav-labeling">
+                <!-- Labeling Icon (Bounding Box with Plus) -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                <span>智能标注</span>
             </div>
             <div class="nav-item" onclick="switchTab('models')" id="nav-models">
                 <!-- Models/Archive Icon -->
@@ -1410,6 +1603,134 @@
                 </div>
             </div>
         </div>
+
+        <!-- View: Labeling (SAM2) -->
+        <div id="view-labeling" class="view-container">
+            <div class="labeling-layout">
+                <!-- Sidebar -->
+                <div class="labeling-sidebar">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>图片列表</span>
+                            <button class="btn btn-secondary btn-icon" onclick="openLabelingFolder()" title="打开文件夹"
+                                style="padding:4px; width:28px; height:28px;">📁</button>
+                        </div>
+                        <div class="image-list-container" id="labelingImageList">
+                            <div style="padding: 20px; text-align: center; color: #aaa;">请先打开文件夹</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Area -->
+                <div class="labeling-canvas-area">
+                    <!-- Toolbar -->
+                    <div class="labeling-toolbar">
+                        <button class="toolbar-btn active" id="tool-auto" onclick="setLabelingMode('auto')"
+                            title="智能标注 (SAM)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                            </svg>
+                            自动 <span class="shortcut-hint">(Q)</span>
+                        </button>
+                        <button class="toolbar-btn" id="tool-rect" onclick="setLabelingMode('rect')" title="手动矩形框">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                            矩形 <span class="shortcut-hint">(R)</span>
+                        </button>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" onclick="labelingAction('undo')" title="撤销上一个点/框 (Ctrl+Z)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v6h6"></path>
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                            </svg>
+                        </button>
+                        <button class="toolbar-btn" onclick="labelingAction('clear')" title="清除当前未完成 (Esc/B)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                            清除 <span class="shortcut-hint">(B)</span>
+                        </button>
+                        <button class="toolbar-btn" onclick="labelingAction('complete')" title="完成当前标注 (Enter/F)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            完成 <span class="shortcut-hint">(F)</span>
+                        </button>
+
+                        <div class="toolbar-info" id="canvasInfo">Loading...</div>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div class="canvas-wrapper" id="canvasWrapper">
+                        <canvas id="labelingCanvas"></canvas>
+                    </div>
+
+                    <!-- Bottom Bar -->
+                    <div
+                        style="height: 48px; background: rgba(255,255,255,0.9); border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; padding: 0 16px;">
+                        <button class="btn btn-secondary" onclick="prevImage()">← (A)</button>
+                        <span style="font-size: 13px; font-weight: 600; color: var(--text-main); font-family: Consolas;"
+                            id="currentImageName">-</span>
+                        <button class="btn btn-secondary" onclick="nextImage()">(D) →</button>
+                    </div>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="labeling-panel">
+                    <!-- Label List -->
+                    <div class="card"
+                        style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 200px;">
+                        <div class="card-header">
+                            <span>分类 (Classes)</span>
+                            <button class="btn btn-secondary btn-icon" onclick="addLabel()"
+                                style="padding: 4px; width: 24px; height: 24px;">+</button>
+                        </div>
+                        <div style="flex: 1; overflow-y: auto; padding-right: 4px;" id="labelListContainer">
+                            <!-- Labels -->
+                        </div>
+                    </div>
+
+                    <!-- Annotations List -->
+                    <div class="card"
+                        style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 200px;">
+                        <div class="card-header"><span>标注 (Objects)</span></div>
+                        <div style="flex: 1; overflow-y: auto;" id="annotationListContainer">
+                            <!-- Current Annotations -->
+                        </div>
+                    </div>
+
+                    <!-- Model Settings -->
+                    <div class="card">
+                        <div class="card-header"><span>模型设置</span></div>
+                        <div class="form-group">
+                            <label class="form-label">模型</label>
+                            <select class="form-control" id="samModelSelect">
+                                <option value="sam2_tiny">SAM2.1 Tiny (推荐)</option>
+                            </select>
+                        </div>
+                        <div class="switch-row" style="padding: 8px 0; border: none; background: transparent;">
+                            <span style="font-size: 13px;">GPU 加速</span>
+                            <label class="switch">
+                                <input type="checkbox" id="samUseGpu" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" id="btnLoadModel" onclick="loadSAMModel()"
+                            style="width: 100%; margin-top: 8px;">
+                            ⚡ 加载模型
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Create Project Modal -->
@@ -1509,6 +1830,16 @@
 
                 if (viewId === 'models') {
                     if (typeof loadTrainingHistory === 'function') loadTrainingHistory();
+                }
+
+                if (viewId === 'labeling') {
+                    // Auto-load SAM2 model if not loaded and not currently loading
+                    if (typeof lblState !== 'undefined' && !lblState.samLoaded) {
+                        const btn = document.getElementById('btnLoadModel');
+                        if (btn && !btn.disabled) {
+                            loadSAMModel();
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("switchTab error:", err);
@@ -1649,16 +1980,23 @@
                         refreshModels();
                     }
                 }
+                else if (data.type === 'labeling') {
+                    // Send request to load images
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'get_images_in_folder',
+                        path: data.path
+                    }));
+                }
             }
 
             else if (data.action === 'augment_progress') {
                 document.getElementById('augmentFill').style.width = data.progress + '%';
-                document.getElementById('augmentPercent').innerText = data.progress + '%';
+                document.getElementById('augmentStatus').innerText = '处理中 ' + data.progress + '%';
             }
 
             else if (data.action === 'augment_complete') {
                 document.getElementById('augmentFill').style.width = '100%';
-                document.getElementById('augmentPercent').innerText = '100%';
+                document.getElementById('augmentStatus').innerText = '完成 100%';
 
                 setTimeout(() => {
                     closeAugmentModal(); addLog('Augmentation Complete', 'success');
@@ -2592,7 +2930,512 @@
             }, 3000);
         }
 
-        // Init
+
+        // ========== Labeling Logic (SAM2) ==========
+        const lblState = {
+            images: [],
+            currentIndex: -1,
+            image: null,      // Image Object
+            imgW: 0,
+            imgH: 0,
+
+            // Viewport
+            scale: 1,
+            offset: { x: 0, y: 0 },
+            isDragging: false,
+            lastMouse: { x: 0, y: 0 },
+
+            // Annotation
+            mode: 'auto',     // 'auto' | 'rect'
+            prompts: [],      // {x, y, isPositive} (Image Space)
+            tempBox: null,    // {x, y, w, h} (Image Space) - From SAM
+            manualStart: null,// {x, y} (Image Space) - For manual rect
+
+            // Data
+            annotations: [],  // {labelIndex, bbox: [x,y,w,h]}
+            labels: [],       // Strings
+            activeLabelIndex: 0,
+
+            samLoaded: false
+        };
+
+        const canvas = document.getElementById('labelingCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+
+        // --- Layout & Resize ---
+        function resizeCanvas() {
+            if (!canvasWrapper) return;
+            canvas.width = canvasWrapper.clientWidth;
+            canvas.height = canvasWrapper.clientHeight;
+            renderCanvas();
+        }
+        new ResizeObserver(resizeCanvas).observe(canvasWrapper);
+
+        // --- Core Interaction ---
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+                // Pan
+                lblState.isDragging = true;
+                lblState.lastMouse = { x: e.clientX, y: e.clientY };
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+
+            if (!lblState.image) return;
+
+            const rect = canvas.getBoundingClientRect();
+            // Mouse to Image Coords
+            const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+            const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+            if (mx < 0 || my < 0 || mx > lblState.imgW || my > lblState.imgH) return;
+
+            if (lblState.mode === 'auto') {
+                // Add Prompt
+                const isPositive = e.button === 0; // Left=Pos, Right=Neg
+                lblState.prompts.push({ x: mx, y: my, isPositive });
+                requestSAMInference();
+                renderCanvas();
+            } else if (lblState.mode === 'rect') {
+                if (e.button === 0) {
+                    lblState.manualStart = { x: mx, y: my };
+                    lblState.tempBox = { x: mx, y: my, w: 0, h: 0 }; // Init temp box
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (lblState.isDragging) {
+                const dx = e.clientX - lblState.lastMouse.x;
+                const dy = e.clientY - lblState.lastMouse.y;
+                lblState.offset.x += dx;
+                lblState.offset.y += dy;
+                lblState.lastMouse = { x: e.clientX, y: e.clientY };
+                renderCanvas();
+                return;
+            }
+
+            // Update Rect Drag
+            if (lblState.mode === 'rect' && lblState.manualStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const w = mx - lblState.manualStart.x;
+                const h = my - lblState.manualStart.y;
+
+                // Normalization handled at render/save
+                lblState.tempBox = {
+                    x: w > 0 ? lblState.manualStart.x : mx,
+                    y: h > 0 ? lblState.manualStart.y : my,
+                    w: Math.abs(w),
+                    h: Math.abs(h)
+                };
+                renderCanvas();
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (lblState.isDragging) {
+                lblState.isDragging = false;
+                canvas.style.cursor = 'default';
+                return;
+            }
+            if (lblState.mode === 'rect' && lblState.manualStart) {
+                // Finish Rect
+                if (lblState.tempBox && lblState.tempBox.w > 5 && lblState.tempBox.h > 5) {
+                    // Auto commit manual rect
+                    commitAnnotation();
+                } else {
+                    lblState.tempBox = null;
+                }
+                lblState.manualStart = null;
+                renderCanvas();
+            }
+        });
+
+        // Prevent Context Menu on Canvas (for Right Click usage)
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoomSpeed = 0.1;
+            const delta = -Math.sign(e.deltaY) * zoomSpeed;
+            const newScale = Math.max(0.1, Math.min(10, lblState.scale * (1 + delta)));
+
+            // Zoom towards mouse
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const imgX = (mx - lblState.offset.x) / lblState.scale;
+            const imgY = (my - lblState.offset.y) / lblState.scale;
+
+            lblState.offset.x = mx - imgX * newScale;
+            lblState.offset.y = my - imgY * newScale;
+            lblState.scale = newScale;
+
+            renderCanvas();
+            updateCanvasInfo();
+        });
+
+        // --- Rendering ---
+        function renderCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(lblState.offset.x, lblState.offset.y);
+            ctx.scale(lblState.scale, lblState.scale);
+
+            // 1. Image
+            if (lblState.image) {
+                ctx.drawImage(lblState.image, 0, 0);
+            }
+
+            // 2. Existing Annotations
+            ctx.lineWidth = 2 / lblState.scale;
+            lblState.annotations.forEach(ann => {
+                ctx.strokeStyle = '#00E676'; // Customize color per label later
+                ctx.fillStyle = 'rgba(0, 230, 118, 0.2)';
+                const b = ann.bbox;
+                ctx.beginPath();
+                ctx.rect(b.x, b.y, b.w, b.h);
+                ctx.stroke();
+                ctx.fill();
+
+                // Label Text
+                ctx.fillStyle = '#00E676';
+                ctx.font = `${14 / lblState.scale}px Arial`;
+                const labelName = lblState.labels[ann.labelIndex] || ann.labelIndex;
+                ctx.fillText(labelName, b.x, b.y - 5 / lblState.scale);
+            });
+
+            // 3. Current Temp Box (Active)
+            if (lblState.tempBox) {
+                ctx.strokeStyle = '#2979FF';
+                ctx.lineWidth = 2 / lblState.scale;
+                ctx.setLineDash([5 / lblState.scale, 5 / lblState.scale]);
+                const b = lblState.tempBox;
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+                ctx.setLineDash([]);
+            }
+
+            // 4. Prompts
+            lblState.prompts.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5 / lblState.scale, 0, Math.PI * 2);
+                ctx.fillStyle = p.isPositive ? '#00E676' : '#FF1744';
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 2 / lblState.scale;
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            ctx.restore();
+            updateCanvasInfo();
+        }
+
+        function updateCanvasInfo() {
+            const info = document.getElementById('canvasInfo');
+            if (lblState.image) {
+                const z = Math.round(lblState.scale * 100);
+                info.innerText = `${lblState.imgW}x${lblState.imgH} | ${z}%`;
+            } else {
+                info.innerText = "No Image";
+            }
+        }
+
+        // --- Actions ---
+
+        function setLabelingMode(m) {
+            lblState.mode = m;
+            document.getElementById('tool-auto').classList.toggle('active', m === 'auto');
+            document.getElementById('tool-rect').classList.toggle('active', m === 'rect');
+        }
+
+        function labelingAction(act) {
+            if (act === 'undo') {
+                if (lblState.mode === 'auto' && lblState.prompts.length > 0) {
+                    lblState.prompts.pop();
+                    requestSAMInference();
+                } else if (lblState.mode === 'rect') {
+                    // Undo rect? maybe just clear
+                    lblState.tempBox = null;
+                }
+            } else if (act === 'clear') {
+                lblState.prompts = [];
+                lblState.tempBox = null;
+                lblState.manualStart = null;
+            } else if (act === 'complete') {
+                commitAnnotation();
+            }
+            renderCanvas();
+        }
+
+        function commitAnnotation() {
+            if (!lblState.tempBox) return;
+            // Check if label exists
+            if (lblState.labels.length === 0) {
+                showMiniToast('warning', '无标签', '请先添加至少一个标签类别');
+                return;
+            }
+
+            lblState.annotations.push({
+                labelIndex: lblState.activeLabelIndex,
+                bbox: { ...lblState.tempBox }
+            });
+
+            // Clear current state
+            lblState.prompts = [];
+            lblState.tempBox = null;
+            renderCanvas();
+            renderAnnotationList();
+
+            // Auto Save to Backend
+            saveAnnotations();
+        }
+
+        // --- Shortcuts ---
+        window.addEventListener('keydown', e => {
+            if (!document.getElementById('view-labeling').classList.contains('active')) return;
+            if (e.target.tagName === 'INPUT') return; // Ignore input fields
+
+            switch (e.key.toLowerCase()) {
+                case 'a': prevImage(); break;
+                case 'd': nextImage(); break;
+                case 'q': setLabelingMode('auto'); break;
+                case 'r': setLabelingMode('rect'); break;
+                case 'f': labelingAction('complete'); break;
+                case 'enter': labelingAction('complete'); break;
+                case 'b': labelingAction('clear'); break;
+                case 'escape': labelingAction('clear'); break;
+                case 'z': if (e.ctrlKey) labelingAction('undo'); break;
+            }
+        });
+
+        // --- Backend Communication ---
+        function openLabelingFolder() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder',
+                type: 'labeling'
+            }));
+        }
+
+        function loadSAMModel() {
+            const btn = document.getElementById('btnLoadModel');
+            btn.disabled = true;
+            btn.innerText = "⏳ 加载中...";
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'load_sam_model',
+                modelType: document.getElementById('samModelSelect').value,
+                useGpu: document.getElementById('samUseGpu').checked
+            }));
+        }
+
+        function requestSAMInference() {
+            if (lblState.prompts.length === 0) {
+                lblState.tempBox = null;
+                renderCanvas();
+                return;
+            }
+            if (!lblState.samLoaded) return; // Silent return if model not ready
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'sam_inference',
+                prompts: lblState.prompts,
+                origW: lblState.imgW,
+                origH: lblState.imgH
+            }));
+        }
+
+        function loadImage(index) {
+            if (index < 0 || index >= lblState.images.length) return;
+
+            // Save current before switching?
+            // saveAnnotations(); // Auto-saved on commit, but maybe final check?
+
+            const item = lblState.images[index];
+            lblState.currentIndex = index;
+            document.getElementById('currentImageName').innerText = item.name;
+
+            // Update List UI
+            document.querySelectorAll('.image-list-item').forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+            });
+
+            // Request Image Data (Base64)
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_image_data',
+                path: item.path
+            }));
+        }
+
+        function nextImage() { loadImage(lblState.currentIndex + 1); }
+        function prevImage() { loadImage(lblState.currentIndex - 1); }
+
+        function saveAnnotations() {
+            if (!lblState.image) return;
+            const currentItem = lblState.images[lblState.currentIndex];
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'save_annotations',
+                imagePath: currentItem.path,
+                annotations: lblState.annotations,
+                width: lblState.imgW,
+                height: lblState.imgH,
+                labels: lblState.labels
+            }));
+        }
+
+        // --- UI Rendering ---
+        function renderLabelList() {
+            const container = document.getElementById('labelListContainer');
+            container.innerHTML = '';
+            lblState.labels.forEach((lbl, idx) => {
+                const el = document.createElement('div');
+                el.className = `label-chip ${idx === lblState.activeLabelIndex ? 'active' : ''}`;
+                el.onclick = () => {
+                    lblState.activeLabelIndex = idx;
+                    renderLabelList();
+                };
+                el.innerHTML = `<span>${idx}: ${lbl}</span>`;
+                container.appendChild(el);
+            });
+        }
+
+        function renderAnnotationList() {
+            const container = document.getElementById('annotationListContainer');
+            container.innerHTML = '';
+            lblState.annotations.forEach((ann, idx) => {
+                const el = document.createElement('div');
+                el.className = 'label-chip'; // reuse style
+                const labelName = lblState.labels[ann.labelIndex] || ann.labelIndex;
+                el.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-weight:bold; margin-right:6px;">${labelName}</span>
+                    </div>
+                    <span onclick="deleteAnnotation(${idx})" style="color:#FF1744; cursor:pointer;">×</span>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function deleteAnnotation(idx) {
+            lblState.annotations.splice(idx, 1);
+            renderAnnotationList();
+            renderCanvas();
+            saveAnnotations();
+        }
+
+        function addLabel() {
+            const name = prompt("输入新类别名称 (English):");
+            if (name && !lblState.labels.includes(name)) {
+                lblState.labels.push(name);
+                renderLabelList();
+            }
+        }
+
+        // Message Handling Extensions
+        const originalMsgHandler = window.chrome.webview.removeEventListener ? null : null; // Just extending logic
+        window.chrome.webview.addEventListener('message', event => {
+            const data = JSON.parse(event.data);
+
+            if (data.action === 'labeling_folder_loaded') {
+                lblState.images = data.images.map(p => ({
+                    path: p,
+                    name: p.split(/[\\/]/).pop(),
+                    status: 'new'
+                }));
+                // Render List
+                const container = document.getElementById('labelingImageList');
+                container.innerHTML = '';
+                lblState.images.forEach((img, idx) => {
+                    const el = document.createElement('div');
+                    el.className = 'image-list-item';
+                    el.innerText = img.name;
+                    el.onclick = () => loadImage(idx);
+                    container.appendChild(el);
+                });
+
+                // Load Labels if provided
+                if (data.labels) {
+                    lblState.labels = data.labels;
+                    renderLabelList();
+                }
+            }
+            else if (data.action === 'sam_model_loaded') {
+                lblState.samLoaded = true;
+                const btn = document.getElementById('btnLoadModel');
+                btn.innerText = "✓ 模型已就绪";
+                btn.classList.replace('btn-primary', 'btn-success');
+                showMiniToast('success', '模型加载成功', 'SAM2 Tiny 模型已准备就绪');
+
+                // [Fix] 如果当前已有图片，重新触发编码 (Reload Encoding if image exists)
+                if (lblState.image) {
+                    addLog("检测到已加载图片，正在重新通过模型编码...", "info");
+                    // 重新发送 encode_image 请求
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'encode_image',
+                        path: lblState.images[lblState.currentIndex].path
+                    }));
+                }
+            }
+            else if (data.action === 'sam_result') {
+                // data.bbox = {x, y, w, h}
+                lblState.tempBox = data.bbox;
+                renderCanvas();
+            }
+            else if (data.action === 'image_encoded') {
+                document.getElementById('canvasInfo').innerText = "Ready";
+                // If existed annotations returned
+                if (data.existing && data.existing.length > 0) {
+                    lblState.annotations = data.existing;
+                    renderCanvas();
+                    renderAnnotationList();
+                }
+            }
+            else if (data.action === 'image_data_loaded') {
+                // Base64 Loaded
+                const img = new Image();
+                img.onload = () => {
+                    lblState.image = img;
+                    lblState.imgW = img.width;
+                    lblState.imgH = img.height;
+
+                    // Fit to view
+                    const wrapper = document.getElementById('canvasWrapper');
+                    if (wrapper) {
+                        const scaleX = wrapper.clientWidth / img.width;
+                        const scaleY = wrapper.clientHeight / img.height;
+                        lblState.scale = Math.min(scaleX, scaleY) * 0.9;
+                        lblState.offset.x = (wrapper.clientWidth - img.width * lblState.scale) / 2;
+                        lblState.offset.y = (wrapper.clientHeight - img.height * lblState.scale) / 2;
+                    }
+
+                    // Clear state
+                    lblState.prompts = [];
+                    lblState.tempBox = null;
+                    lblState.annotations = [];
+
+                    // Request Encode (for SAM2 backend)
+                    if (lblState.samLoaded) {
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            action: 'encode_image',
+                            path: data.path
+                        }));
+                    } else {
+                        addLog("模型尚未加载，暂不进行编码 (Model not ready)", "info");
+                    }
+
+                    renderCanvas();
+                };
+                img.src = "data:image/jpeg;base64," + data.base64;
+            }
+        });
+
+
         setTimeout(() => {
             loadProjects();
             loadPythonPath();

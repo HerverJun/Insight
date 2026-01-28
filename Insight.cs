@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using OpenCvSharp;
 using System.Drawing.Imaging;
 using System.Reflection;
 using System.Text.Json;
@@ -15,6 +16,8 @@ namespace Insight
         private readonly Random _random = new();
         private System.Diagnostics.Process? _trainingProcess;
         private bool _isTraining = false;
+        private SAM2Service? _sam2Service;
+        private string? _currentLabelingImagePath;
 
         // Win32 API for window dragging
 
@@ -34,7 +37,7 @@ namespace Insight
             this.StartPosition = FormStartPosition.CenterScreen;
 
             // 设定默认大小
-            this.Size = new Size(1280, 800);
+            this.Size = new System.Drawing.Size(1280, 800);
 
             // 启动时最大化
             this.WindowState = FormWindowState.Maximized;
@@ -266,6 +269,24 @@ namespace Insight
                         break;
                     case "get_default_python_path":
                         HandleGetDefaultPythonPath();
+                        break;
+                    case "load_sam_model":
+                        HandleLoadSAMModel(root);
+                        break;
+                    case "encode_image":
+                        HandleEncodeImage(root);
+                        break;
+                    case "sam_inference":
+                        HandleSAMInference(root);
+                        break;
+                    case "save_annotations":
+                        HandleSaveAnnotations(root);
+                        break;
+                    case "get_images_in_folder":
+                        HandleGetImagesInFolder(root);
+                        break;
+                    case "get_image_data":
+                        HandleGetImageData(root);
                         break;
                 }
             }
@@ -1791,6 +1812,288 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
             catch (Exception ex)
             {
                 SendError($"无法打开文件夹: {ex.Message}");
+            }
+        }
+        private async void HandleLoadSAMModel(JsonElement data)
+        {
+            try
+            {
+                var modelType = data.GetProperty("modelType").GetString();
+                bool useGpu = true;
+                if (data.TryGetProperty("useGpu", out var gpuProp)) useGpu = gpuProp.GetBoolean();
+
+                SendLog($"正在加载模型: {modelType} (GPU: {useGpu})...", "info");
+
+                await Task.Run(() =>
+                {
+                    if (_sam2Service != null) _sam2Service.Dispose();
+                    _sam2Service = new SAM2Service();
+
+                    string modelDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models");
+                    string encoderPath = Path.Combine(modelDir, "sam2.1_hiera_tiny.encoder.onnx");
+                    string decoderPath = Path.Combine(modelDir, "sam2.1_hiera_tiny.decoder.onnx");
+
+                    if (!File.Exists(encoderPath) || !File.Exists(decoderPath))
+                    {
+                        this.Invoke(() => SendError("模型文件未找到，请检查 models 文件夹"));
+                        return;
+                    }
+
+                    _sam2Service.LoadModels(encoderPath, decoderPath, useGpu);
+                    this.Invoke(() =>
+                    {
+                        SendLog("SAM2 模型加载成功！", "success");
+                        SendToFrontend(new { action = "sam_model_loaded" });
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                SendError($"加载模型失败: {ex.Message}");
+            }
+        }
+
+        private async void HandleEncodeImage(JsonElement data)
+        {
+            try
+            {
+                var path = data.GetProperty("path").GetString();
+                Console.WriteLine($"[Insight] HandleEncodeImage called, path: {path}");
+
+                if (string.IsNullOrEmpty(path))
+                {
+                    Console.WriteLine("[Insight] Path is empty!");
+                    return;
+                }
+
+                if (!File.Exists(path))
+                {
+                    Console.WriteLine($"[Insight] File not found: {path}");
+                    return;
+                }
+
+                if (_sam2Service == null)
+                {
+                    Console.WriteLine("[Insight] SAM2 service is null! Model not loaded?");
+                    SendError("SAM2 模型未加载，请先点击'加载模型'按钮");
+                    return;
+                }
+
+                _currentLabelingImagePath = path;
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        Console.WriteLine("[Insight] Calling SAM2 EncodeImage...");
+                        _sam2Service?.EncodeImage(path);
+                        Console.WriteLine("[Insight] EncodeImage completed, loading annotations...");
+
+                        // Load existing annotations if any (YOLO txt)
+                        var txtPath = Path.ChangeExtension(path, ".txt");
+                        var existingAnns = new List<object>();
+
+                        if (File.Exists(txtPath))
+                        {
+                            var lines = File.ReadAllLines(txtPath);
+                            // Need image size for denormalization? Frontend has size.
+                            // Better: Send raw YOLO lines and let Frontend denormalize?
+                            // Or denormalize here if we read image size. 
+                            // Since we just encoded, we know the size? 
+                            // Using OpenCvSharp to peek size.
+                            using var img = Cv2.ImRead(path);
+                            int w = img.Width;
+                            int h = img.Height;
+
+                            foreach (var line in lines)
+                            {
+                                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                if (parts.Length >= 5)
+                                {
+                                    if (int.TryParse(parts[0], out int cls) &&
+                                        float.TryParse(parts[1], out float cx) &&
+                                        float.TryParse(parts[2], out float cy) &&
+                                        float.TryParse(parts[3], out float nw) &&
+                                        float.TryParse(parts[4], out float nh))
+                                    {
+                                        // Convert YOLO (cx, cy, w, h) to Box (x, y, w, h)
+                                        float boxW = nw * w;
+                                        float boxH = nh * h;
+                                        float boxX = (cx * w) - (boxW / 2);
+                                        float boxY = (cy * h) - (boxH / 2);
+
+                                        existingAnns.Add(new
+                                        {
+                                            labelIndex = cls,
+                                            bbox = new { x = boxX, y = boxY, w = boxW, h = boxH }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        this.Invoke(() =>
+                        {
+                            SendToFrontend(new { action = "image_encoded", success = true, existing = existingAnns });
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        this.Invoke(() => SendError($"编码图像失败: {ex.Message}"));
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                SendError($"请求编码失败: {ex.Message}");
+            }
+        }
+
+        private async void HandleSAMInference(JsonElement data)
+        {
+            if (_sam2Service == null || !_sam2Service.IsLoaded) return;
+
+            try
+            {
+                var prompts = new List<(System.Drawing.Point, bool)>();
+                var promptArray = data.GetProperty("prompts").EnumerateArray();
+
+                foreach (var p in promptArray)
+                {
+                    int x = (int)p.GetProperty("x").GetDouble();
+                    int y = (int)p.GetProperty("y").GetDouble();
+                    bool isPos = p.GetProperty("isPositive").GetBoolean();
+                    prompts.Add((new System.Drawing.Point(x, y), isPos));
+                }
+
+                await Task.Run(() =>
+                {
+                    var bbox = _sam2Service.Predict(prompts);
+                    if (bbox != null && bbox.Length == 4)
+                    {
+                        this.Invoke(() =>
+                        {
+                            SendToFrontend(new
+                            {
+                                action = "sam_result",
+                                bbox = new { x = bbox[0], y = bbox[1], w = bbox[2], h = bbox[3] }
+                            });
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        private void HandleSaveAnnotations(JsonElement data)
+        {
+            try
+            {
+                var imagePath = data.GetProperty("imagePath").GetString();
+                var width = data.GetProperty("width").GetDouble();
+                var height = data.GetProperty("height").GetDouble();
+                var anns = data.GetProperty("annotations").EnumerateArray();
+                var labels = data.GetProperty("labels").EnumerateArray().Select(x => x.GetString()).ToList();
+
+                if (string.IsNullOrEmpty(imagePath)) return;
+
+                var txtPath = Path.ChangeExtension(imagePath, ".txt");
+                var lines = new List<string>();
+
+                foreach (var ann in anns)
+                {
+                    int clsIdx = ann.GetProperty("labelIndex").GetInt32();
+                    var bbox = ann.GetProperty("bbox");
+                    double x = bbox.GetProperty("x").GetDouble();
+                    double y = bbox.GetProperty("y").GetDouble();
+                    double w = bbox.GetProperty("w").GetDouble();
+                    double h = bbox.GetProperty("h").GetDouble();
+
+                    // Convert to YOLO
+                    double cx = (x + w / 2.0) / width;
+                    double cy = (y + h / 2.0) / height;
+                    double nw = w / width;
+                    double nh = h / height;
+
+                    // Clamp
+                    cx = Math.Max(0, Math.Min(1, cx));
+                    cy = Math.Max(0, Math.Min(1, cy));
+                    nw = Math.Max(0, Math.Min(1, nw));
+                    nh = Math.Max(0, Math.Min(1, nh));
+
+                    lines.Add($"{clsIdx} {cx:F6} {cy:F6} {nw:F6} {nh:F6}");
+                }
+
+                File.WriteAllLines(txtPath, lines);
+
+                // Save classes.txt
+                if (labels.Count > 0)
+                {
+                    var classesPath = Path.Combine(Path.GetDirectoryName(imagePath)!, "classes.txt");
+                    // Only write if not exists or if we added new classes? 
+                    // Usually we overwrite to ensure consistency.
+                    File.WriteAllLines(classesPath, labels!);
+                }
+
+                SendLog($"标注已保存: {Path.GetFileName(txtPath)}", "success");
+            }
+            catch (Exception ex)
+            {
+                SendError($"保存标注失败: {ex.Message}");
+            }
+        }
+
+        private void HandleGetImagesInFolder(JsonElement data)
+        {
+            try
+            {
+                var path = data.GetProperty("path").GetString();
+                if (Directory.Exists(path))
+                {
+                    var ext = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
+                    var files = Directory.GetFiles(path)
+                        .Where(f => ext.Contains(Path.GetExtension(f).ToLower()))
+                        .OrderBy(f => f)
+                        .ToArray();
+
+                    // Try load classes.txt
+                    string[]? classes = null;
+                    var clsPath = Path.Combine(path, "classes.txt");
+                    if (File.Exists(clsPath))
+                    {
+                        classes = File.ReadAllLines(clsPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+                    }
+
+                    SendToFrontend(new { action = "labeling_folder_loaded", images = files, labels = classes });
+                }
+            }
+            catch (Exception ex)
+            {
+                SendError($"获取图片列表失败: {ex.Message}");
+            }
+        }
+        private void HandleGetImageData(JsonElement data)
+        {
+            try
+            {
+                var path = data.GetProperty("path").GetString();
+                if (File.Exists(path))
+                {
+                    var bytes = File.ReadAllBytes(path);
+                    var base64 = Convert.ToBase64String(bytes);
+                    SendToFrontend(new { action = "image_data_loaded", base64 = base64, path = path });
+                }
+                else
+                {
+                    SendError("图片文件不存在");
+                }
+            }
+            catch (Exception ex)
+            {
+                SendError($"加载图片数据失败: {ex.Message}");
             }
         }
     }
