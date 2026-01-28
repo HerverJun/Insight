@@ -1713,7 +1713,7 @@
                         <div class="form-group">
                             <label class="form-label">模型</label>
                             <select class="form-control" id="samModelSelect">
-                                <option value="sam2_tiny">SAM2.1 Tiny (推荐)</option>
+                                <option value="sam2.1_hiera_tiny">SAM2.1 Tiny (推荐)</option>
                             </select>
                         </div>
                         <div class="switch-row" style="padding: 8px 0; border: none; background: transparent;">
@@ -1722,6 +1722,18 @@
                                 <input type="checkbox" id="samUseGpu" checked>
                                 <span class="slider"></span>
                             </label>
+                        </div>
+                        <div class="form-group" style="margin-top: 8px;">
+                            <label class="form-label">阈值 (灵敏度) <span id="thresholdValue"
+                                    style="color: var(--primary); font-weight: bold;">0.0</span></label>
+                            <input type="range" id="samThreshold" min="-5" max="5" step="0.5" value="0"
+                                style="width: 100%; cursor: pointer;"
+                                oninput="document.getElementById('thresholdValue').innerText = parseFloat(this.value).toFixed(1)">
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 2px;">
+                                <span>宽松 (-5)</span>
+                                <span>严格 (+5)</span>
+                            </div>
                         </div>
                         <button class="btn btn-primary" id="btnLoadModel" onclick="loadSAMModel()"
                             style="width: 100%; margin-top: 8px;">
@@ -1833,12 +1845,12 @@
                 }
 
                 if (viewId === 'labeling') {
-                    // Auto-load SAM2 model if not loaded and not currently loading
+                    // 请求可用模型列表
+                    window.chrome.webview.postMessage(JSON.stringify({ action: 'get_sam_models' }));
+
+                    // 标记需要自动加载，等模型列表返回后再执行
                     if (typeof lblState !== 'undefined' && !lblState.samLoaded) {
-                        const btn = document.getElementById('btnLoadModel');
-                        if (btn && !btn.disabled) {
-                            loadSAMModel();
-                        }
+                        lblState.pendingAutoLoad = true;
                     }
                 }
             } catch (err) {
@@ -2992,11 +3004,9 @@
             if (mx < 0 || my < 0 || mx > lblState.imgW || my > lblState.imgH) return;
 
             if (lblState.mode === 'auto') {
-                // Add Prompt
-                const isPositive = e.button === 0; // Left=Pos, Right=Neg
-                lblState.prompts.push({ x: mx, y: my, isPositive });
-                requestSAMInference();
-                renderCanvas();
+                // 记录起始点，在 mouseup 时决定是点击还是拖拽
+                lblState.autoStart = { x: mx, y: my, button: e.button };
+                lblState.tempBox = null; // 清空临时框
             } else if (lblState.mode === 'rect') {
                 if (e.button === 0) {
                     lblState.manualStart = { x: mx, y: my };
@@ -3016,7 +3026,7 @@
                 return;
             }
 
-            // Update Rect Drag
+            // Update Rect Drag for rect mode
             if (lblState.mode === 'rect' && lblState.manualStart) {
                 const rect = canvas.getBoundingClientRect();
                 const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
@@ -3033,6 +3043,27 @@
                     h: Math.abs(h)
                 };
                 renderCanvas();
+            }
+
+            // 自动模式的拖拽预览
+            if (lblState.mode === 'auto' && lblState.autoStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const dx = mx - lblState.autoStart.x;
+                const dy = my - lblState.autoStart.y;
+
+                // 如果移动距离超过 5px，显示临时框
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    lblState.tempBox = {
+                        x: dx > 0 ? lblState.autoStart.x : mx,
+                        y: dy > 0 ? lblState.autoStart.y : my,
+                        w: Math.abs(dx),
+                        h: Math.abs(dy)
+                    };
+                    renderCanvas();
+                }
             }
         });
 
@@ -3051,6 +3082,30 @@
                     lblState.tempBox = null;
                 }
                 lblState.manualStart = null;
+                renderCanvas();
+            }
+
+            // 自动模式：判断是点击还是拖拽
+            if (lblState.mode === 'auto' && lblState.autoStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const dx = mx - lblState.autoStart.x;
+                const dy = my - lblState.autoStart.y;
+
+                if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                    // 点击模式：添加点提示
+                    const isPositive = lblState.autoStart.button === 0;
+                    lblState.prompts.push({ x: lblState.autoStart.x, y: lblState.autoStart.y, isPositive });
+                    requestSAMInference();
+                } else {
+                    // 拖拽模式：清空之前的点提示，发送框提示
+                    lblState.prompts = [];
+                    requestSAMInferenceWithBox(lblState.tempBox);
+                }
+
+                lblState.autoStart = null;
                 renderCanvas();
             }
         });
@@ -3224,12 +3279,21 @@
 
         function loadSAMModel() {
             const btn = document.getElementById('btnLoadModel');
+            const modelName = document.getElementById('samModelSelect').value;
+
+            if (!modelName) {
+                showMiniToast('error', '未选择模型', '请先在下拉列表中选择一个模型');
+                return;
+            }
+
             btn.disabled = true;
             btn.innerText = "⏳ 加载中...";
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
 
             window.chrome.webview.postMessage(JSON.stringify({
                 action: 'load_sam_model',
-                modelType: document.getElementById('samModelSelect').value,
+                modelName: modelName,
                 useGpu: document.getElementById('samUseGpu').checked
             }));
         }
@@ -3242,9 +3306,38 @@
             }
             if (!lblState.samLoaded) return; // Silent return if model not ready
 
+            const threshold = parseFloat(document.getElementById('samThreshold').value) || 0;
             window.chrome.webview.postMessage(JSON.stringify({
                 action: 'sam_inference',
                 prompts: lblState.prompts,
+                threshold: threshold,
+                origW: lblState.imgW,
+                origH: lblState.imgH
+            }));
+        }
+
+        function requestSAMInferenceWithBox(box) {
+            if (!box || box.w < 5 || box.h < 5) {
+                lblState.tempBox = null;
+                renderCanvas();
+                return;
+            }
+            if (!lblState.samLoaded) {
+                showMiniToast('warning', '模型未加载', '请先加载 SAM 模型');
+                return;
+            }
+
+            const threshold = parseFloat(document.getElementById('samThreshold').value) || 0;
+            // 发送带 boxPrompt 的推理请求
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'sam_inference',
+                boxPrompt: {
+                    x1: box.x,
+                    y1: box.y,
+                    x2: box.x + box.w,
+                    y2: box.y + box.h
+                },
+                threshold: threshold,
                 origW: lblState.imgW,
                 origH: lblState.imgH
             }));
@@ -3365,12 +3458,47 @@
                     renderLabelList();
                 }
             }
+            else if (data.action === 'sam_models_loaded') {
+                const select = document.getElementById('samModelSelect');
+                if (select) {
+                    const currentVal = select.value;
+                    select.innerHTML = '';
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m;
+                            opt.innerText = m;
+                            select.appendChild(opt);
+                        });
+                        // 尽量保持之前的选择
+                        if (data.models.includes(currentVal)) {
+                            select.value = currentVal;
+                        }
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = "";
+                        opt.innerText = "未找到模型";
+                        select.appendChild(opt);
+                    }
+                }
+                // 如果有待执行的自动加载，现在执行
+                if (lblState.pendingAutoLoad && data.models && data.models.length > 0) {
+                    lblState.pendingAutoLoad = false;
+                    const btn = document.getElementById('btnLoadModel');
+                    if (btn && !btn.disabled) {
+                        loadSAMModel();
+                    }
+                }
+            }
             else if (data.action === 'sam_model_loaded') {
                 lblState.samLoaded = true;
+                lblState.currentModel = data.modelName || 'unknown';
                 const btn = document.getElementById('btnLoadModel');
-                btn.innerText = "✓ 模型已就绪";
-                btn.classList.replace('btn-primary', 'btn-success');
-                showMiniToast('success', '模型加载成功', 'SAM2 Tiny 模型已准备就绪');
+                btn.disabled = false; // 保持可点击状态以便切换模型
+                btn.innerText = "✓ " + lblState.currentModel;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-success');
+                showMiniToast('success', '模型加载成功', lblState.currentModel + ' 已准备就绪');
 
                 // [Fix] 如果当前已有图片，重新触发编码 (Reload Encoding if image exists)
                 if (lblState.image) {

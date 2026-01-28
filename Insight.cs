@@ -206,6 +206,9 @@ namespace Insight
                             SendToFrontend(new { action = "subfolders_loaded", folders = sub });
                         }
                         break;
+                    case "get_sam_models":
+                        HandleGetSAMModels();
+                        break;
                     case "get_models":
                         HandleGetModels(root);
                         break;
@@ -1814,15 +1817,56 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 SendError($"无法打开文件夹: {ex.Message}");
             }
         }
+        private void HandleGetSAMModels()
+        {
+            try
+            {
+                string modelDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models");
+                if (!Directory.Exists(modelDir))
+                {
+                    Directory.CreateDirectory(modelDir);
+                    SendToFrontend(new { action = "sam_models_loaded", models = new string[] { } });
+                    return;
+                }
+
+                // 寻找所有以 .encoder.onnx 结尾的文件
+                var encoders = Directory.GetFiles(modelDir, "*.encoder.onnx");
+                var modelList = new List<string>();
+
+                foreach (var encoder in encoders)
+                {
+                    string fileName = Path.GetFileName(encoder);
+                    string modelName = fileName.Substring(0, fileName.Length - ".encoder.onnx".Length);
+                    string decoderPath = Path.Combine(modelDir, modelName + ".decoder.onnx");
+
+                    // 如果对齐的解码器也存在，则这是一个可用的 SAM2 模型对
+                    if (File.Exists(decoderPath))
+                    {
+                        modelList.Add(modelName);
+                    }
+                }
+
+                SendToFrontend(new { action = "sam_models_loaded", models = modelList.ToArray() });
+            }
+            catch (Exception ex)
+            {
+                SendError($"扫描模型目录失败: {ex.Message}");
+            }
+        }
+
         private async void HandleLoadSAMModel(JsonElement data)
         {
             try
             {
-                var modelType = data.GetProperty("modelType").GetString();
+                // 增加对自定义模型名称的支持
+                string modelName = "sam2.1_hiera_tiny"; // 默认名
+                if (data.TryGetProperty("modelName", out var nameProp)) modelName = nameProp.GetString()!;
+                else if (data.TryGetProperty("modelType", out var typeProp)) modelName = typeProp.GetString()!;
+
                 bool useGpu = true;
                 if (data.TryGetProperty("useGpu", out var gpuProp)) useGpu = gpuProp.GetBoolean();
 
-                SendLog($"正在加载模型: {modelType} (GPU: {useGpu})...", "info");
+                SendLog($"正在加载模型: {modelName} (GPU: {useGpu})...", "info");
 
                 await Task.Run(() =>
                 {
@@ -1830,20 +1874,20 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                     _sam2Service = new SAM2Service();
 
                     string modelDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "models");
-                    string encoderPath = Path.Combine(modelDir, "sam2.1_hiera_tiny.encoder.onnx");
-                    string decoderPath = Path.Combine(modelDir, "sam2.1_hiera_tiny.decoder.onnx");
+                    string encoderPath = Path.Combine(modelDir, $"{modelName}.encoder.onnx");
+                    string decoderPath = Path.Combine(modelDir, $"{modelName}.decoder.onnx");
 
                     if (!File.Exists(encoderPath) || !File.Exists(decoderPath))
                     {
-                        this.Invoke(() => SendError("模型文件未找到，请检查 models 文件夹"));
+                        this.Invoke(() => SendError($"模型文件未找到: {modelName}，请检查 models 文件夹"));
                         return;
                     }
 
                     _sam2Service.LoadModels(encoderPath, decoderPath, useGpu);
                     this.Invoke(() =>
                     {
-                        SendLog("SAM2 模型加载成功！", "success");
-                        SendToFrontend(new { action = "sam_model_loaded" });
+                        SendLog($"SAM2 模型 [{modelName}] 加载成功！", "success");
+                        SendToFrontend(new { action = "sam_model_loaded", modelName = modelName });
                     });
                 });
             }
@@ -1955,32 +1999,59 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
             try
             {
-                var prompts = new List<(System.Drawing.Point, bool)>();
-                var promptArray = data.GetProperty("prompts").EnumerateArray();
+                float[]? bbox = null;
 
-                foreach (var p in promptArray)
+                // 解析阈值参数，默认为 0.0
+                float threshold = 0.0f;
+                if (data.TryGetProperty("threshold", out var thresholdProp))
                 {
-                    int x = (int)p.GetProperty("x").GetDouble();
-                    int y = (int)p.GetProperty("y").GetDouble();
-                    bool isPos = p.GetProperty("isPositive").GetBoolean();
-                    prompts.Add((new System.Drawing.Point(x, y), isPos));
+                    threshold = (float)thresholdProp.GetDouble();
                 }
 
-                await Task.Run(() =>
+                // 检查是否有 Box Prompt
+                if (data.TryGetProperty("boxPrompt", out var boxProp))
                 {
-                    var bbox = _sam2Service.Predict(prompts);
-                    if (bbox != null && bbox.Length == 4)
+                    float x1 = (float)boxProp.GetProperty("x1").GetDouble();
+                    float y1 = (float)boxProp.GetProperty("y1").GetDouble();
+                    float x2 = (float)boxProp.GetProperty("x2").GetDouble();
+                    float y2 = (float)boxProp.GetProperty("y2").GetDouble();
+
+                    await Task.Run(() =>
                     {
-                        this.Invoke(() =>
-                        {
-                            SendToFrontend(new
-                            {
-                                action = "sam_result",
-                                bbox = new { x = bbox[0], y = bbox[1], w = bbox[2], h = bbox[3] }
-                            });
-                        });
+                        bbox = _sam2Service.PredictWithBox(x1, y1, x2, y2, threshold);
+                    });
+                }
+                else if (data.TryGetProperty("prompts", out var promptsProp))
+                {
+                    // 点提示模式
+                    var prompts = new List<(System.Drawing.Point, bool)>();
+                    var promptArray = promptsProp.EnumerateArray();
+
+                    foreach (var p in promptArray)
+                    {
+                        int x = (int)p.GetProperty("x").GetDouble();
+                        int y = (int)p.GetProperty("y").GetDouble();
+                        bool isPos = p.GetProperty("isPositive").GetBoolean();
+                        prompts.Add((new System.Drawing.Point(x, y), isPos));
                     }
-                });
+
+                    await Task.Run(() =>
+                    {
+                        bbox = _sam2Service.Predict(prompts, threshold);
+                    });
+                }
+
+                if (bbox != null && bbox.Length == 4)
+                {
+                    this.Invoke(() =>
+                    {
+                        SendToFrontend(new
+                        {
+                            action = "sam_result",
+                            bbox = new { x = bbox[0], y = bbox[1], w = bbox[2], h = bbox[3] }
+                        });
+                    });
+                }
             }
             catch (Exception ex)
             {

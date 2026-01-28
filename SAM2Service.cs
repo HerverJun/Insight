@@ -257,7 +257,184 @@ namespace Insight
             }
         }
 
-        public float[]? Predict(List<(Point point, bool isPositive)> prompts)
+        /// <summary>
+        /// 使用矩形框提示进行预测 (Box Prompt)
+        /// SAM 2 的 Box Prompt 通过两个特殊标签的点来表示：
+        /// - 左上角点: label = 2
+        /// - 右下角点: label = 3
+        /// </summary>
+        public float[]? PredictWithBox(float x1, float y1, float x2, float y2, float threshold = 0.0f)
+        {
+            if (_decoderSession == null || _imageEmbeddings == null)
+            {
+                Console.WriteLine("[SAM2] PredictWithBox: Decoder not ready or image not encoded");
+                return null;
+            }
+
+            try
+            {
+                Console.WriteLine($"[SAM2] PredictWithBox: ({x1}, {y1}) to ({x2}, {y2})");
+
+                // Box Prompt 需要 2 个点: 左上角和右下角
+                int numPoints = 2;
+                var pointCoords = new DenseTensor<float>(new[] { 1, numPoints, 2 });
+                var pointLabels = new DenseTensor<float>(new[] { 1, numPoints });
+
+                // 左上角点 - Label 2 表示 box 的左上角
+                pointCoords[0, 0, 0] = x1 * _scale;
+                pointCoords[0, 0, 1] = y1 * _scale;
+                pointLabels[0, 0] = 2.0f;
+
+                // 右下角点 - Label 3 表示 box 的右下角
+                pointCoords[0, 1, 0] = x2 * _scale;
+                pointCoords[0, 1, 1] = y2 * _scale;
+                pointLabels[0, 1] = 3.0f;
+
+                // 准备解码器输入
+                var decoderInputs = _decoderSession.InputMetadata;
+                var inputs = new List<NamedOnnxValue>();
+
+                foreach (var inputMeta in decoderInputs)
+                {
+                    var name = inputMeta.Key;
+                    var dims = inputMeta.Value.Dimensions;
+
+                    if (name.Contains("embed"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name,
+                            new DenseTensor<float>(new Memory<float>(_imageEmbeddings!), new ReadOnlySpan<int>(_embeddingShape))));
+                    }
+                    else if (name.Contains("feat") && name.Contains("0"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name,
+                            new DenseTensor<float>(new Memory<float>(_highResFeats0!), new ReadOnlySpan<int>(_feat0Shape))));
+                    }
+                    else if (name.Contains("feat") && name.Contains("1"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name,
+                            new DenseTensor<float>(new Memory<float>(_highResFeats1!), new ReadOnlySpan<int>(_feat1Shape))));
+                    }
+                    else if (name.Contains("coord"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name, pointCoords));
+                    }
+                    else if (name.Contains("label"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name, pointLabels));
+                    }
+                    else if (name == "has_mask_input" || (name.Contains("has_mask") && !name.Contains("mask_input")))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name, new DenseTensor<float>(new float[] { 0.0f }, new[] { 1 })));
+                    }
+                    else if (name.Contains("mask_input"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name, new DenseTensor<float>(new[] { 1, 1, 256, 256 })));
+                    }
+                    else if (name.Contains("orig") || name.Contains("size"))
+                    {
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name,
+                            new DenseTensor<float>(new float[] { (float)_inputSize, (float)_inputSize }, new[] { 2 })));
+                    }
+                    else
+                    {
+                        var shape = dims.Select(d => d > 0 ? d : 1).ToArray();
+                        inputs.Add(NamedOnnxValue.CreateFromTensor(name, new DenseTensor<float>(shape)));
+                    }
+                }
+
+                // 运行解码器
+                using var results = _decoderSession.Run(inputs);
+
+                var masksNode = results.FirstOrDefault(r => r.Name.Contains("mask") && !r.Name.Contains("iou"));
+                var iouNode = results.FirstOrDefault(r => r.Name.Contains("iou") || r.Name.Contains("score"));
+
+                if (masksNode == null)
+                {
+                    Console.WriteLine("[SAM2] PredictWithBox: No mask output found!");
+                    return new float[] { 0, 0, 0, 0 };
+                }
+
+                var masks = masksNode.AsTensor<float>();
+
+                // 选择最佳 mask
+                int bestMaskIndex = 0;
+                if (iouNode != null)
+                {
+                    var iou = iouNode.AsTensor<float>();
+                    float maxIoU = -1;
+                    int numMasks = iou.Dimensions.Length > 1 ? iou.Dimensions[1] : 1;
+
+                    for (int i = 0; i < numMasks; i++)
+                    {
+                        float score = iou.Dimensions.Length > 1 ? iou[0, i] : iou[i];
+                        if (score > maxIoU)
+                        {
+                            maxIoU = score;
+                            bestMaskIndex = i;
+                        }
+                    }
+                    Console.WriteLine($"[SAM2] PredictWithBox: Best mask index: {bestMaskIndex}, IoU: {maxIoU}");
+                }
+
+                // 提取 Bounding Box
+                int maskH = masks.Dimensions[^2];
+                int maskW = masks.Dimensions[^1];
+
+                float minX = maskW, minY = maskH, maxX = 0, maxY = 0;
+                bool found = false;
+
+                for (int y = 0; y < maskH; y++)
+                {
+                    for (int x = 0; x < maskW; x++)
+                    {
+                        float val = masks.Dimensions.Length == 4 ? masks[0, bestMaskIndex, y, x] : masks[0, y, x];
+                        if (val > threshold) // 使用用户设置的阈值
+                        {
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
+                            found = true;
+                        }
+                    }
+                }
+
+                if (!found)
+                {
+                    Console.WriteLine("[SAM2] PredictWithBox: No positive mask pixels found");
+                    return new float[] { 0, 0, 0, 0 };
+                }
+
+                // 缩放回原始坐标
+                float scaleToInput = (float)_inputSize / maskW;
+                minX *= (scaleToInput / _scale);
+                maxX *= (scaleToInput / _scale);
+                minY *= (scaleToInput / _scale);
+                maxY *= (scaleToInput / _scale);
+
+                // 增加冗余边距
+                float w = maxX - minX;
+                float h = maxY - minY;
+                float padW = w * 0.03f + 2.0f;
+                float padH = h * 0.03f + 2.0f;
+
+                float finalX = Math.Max(0, minX - padW);
+                float finalY = Math.Max(0, minY - padH);
+                float finalW = w + padW * 2;
+                float finalH = h + padH * 2;
+
+                Console.WriteLine($"[SAM2] PredictWithBox BBox: ({finalX}, {finalY}, {finalW}, {finalH})");
+                return new float[] { finalX, finalY, finalW, finalH };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SAM2] PredictWithBox error: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+                return null;
+            }
+        }
+
+        public float[]? Predict(List<(Point point, bool isPositive)> prompts, float threshold = 0.0f)
         {
             if (_decoderSession == null || _imageEmbeddings == null)
             {
@@ -402,7 +579,7 @@ namespace Insight
                     for (int x = 0; x < maskW; x++)
                     {
                         float val = masks.Dimensions.Length == 4 ? masks[0, bestMaskIndex, y, x] : masks[0, y, x];
-                        if (val > 0.0f)
+                        if (val > threshold) // 使用用户设置的阈值
                         {
                             if (x < minX) minX = x;
                             if (x > maxX) maxX = x;
@@ -421,13 +598,24 @@ namespace Insight
 
                 // Scale back to original coordinates
                 float scaleToInput = (float)_inputSize / maskW;
-                minX *= scaleToInput / _scale;
-                maxX *= scaleToInput / _scale;
-                minY *= scaleToInput / _scale;
-                maxY *= scaleToInput / _scale;
+                minX *= (scaleToInput / _scale);
+                maxX *= (scaleToInput / _scale);
+                minY *= (scaleToInput / _scale);
+                maxY *= (scaleToInput / _scale);
 
-                Console.WriteLine($"[SAM2] BBox: ({minX}, {minY}, {maxX - minX}, {maxY - minY})");
-                return new float[] { minX, minY, maxX - minX, maxY - minY };
+                // 增加冗余边距 (3% + 2px) 以覆盖螺钉等小目标的完整面积
+                float w = maxX - minX;
+                float h = maxY - minY;
+                float padW = w * 0.03f + 2.0f;
+                float padH = h * 0.03f + 2.0f;
+
+                float finalX = Math.Max(0, minX - padW);
+                float finalY = Math.Max(0, minY - padH);
+                float finalW = w + padW * 2;
+                float finalH = h + padH * 2;
+
+                Console.WriteLine($"[SAM2] BBox (padded): ({finalX}, {finalY}, {finalW}, {finalH})");
+                return new float[] { finalX, finalY, finalW, finalH };
             }
             catch (Exception ex)
             {
