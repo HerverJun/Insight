@@ -1203,6 +1203,19 @@
                 </svg>
                 <span>训练历史</span>
             </div>
+            <div class="nav-item" onclick="switchTab('onnx')" id="nav-onnx">
+                <!-- ONNX 图标 -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                    <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                    <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>ONNX管理</span>
+            </div>
         </div>
         <div style="flex: 1;"></div>
         <div style="font-size: 11px; color: var(--text-light); text-align: center; margin-top: 20px;">v2.1.0</div>
@@ -1290,10 +1303,10 @@
                                         <option value="v8m">Medium (v8m)</option>
                                         <option value="v8l">Large (v8l)</option>
                                     </optgroup>
-                                    <optgroup label="YOLOv11">
-                                        <option value="v11n">Nano (v11n)</option>
-                                        <option value="v11s">Small (v11s)</option>
-                                        <option value="v11m">Medium (v11m)</option>
+                                    <optgroup label="YOLO11">
+                                        <option value="v11n">Nano (11n)</option>
+                                        <option value="v11s">Small (11s)</option>
+                                        <option value="v11m">Medium (11m)</option>
                                     </optgroup>
                                     <optgroup label="YOLO26">
                                         <option value="v26n">Nano (v26n)</option>
@@ -1356,14 +1369,19 @@
                             </div>
                         </div>
 
-                        <div style="margin-top: 24px;"><button id="btnGenerate" class="btn btn-primary"
-                                onclick="startGenerate()" style="width: 100%;">✨ 生成数据集 (Generate) </button>
-                            <div id="statusMessage"
-                                style="text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-sub); height: 20px;">
-                            </div>
-                            <!-- Status Grid -->
-
+                        <div style="margin-top: 24px; display: flex; gap: 12px;">
+                            <button id="btnGenerate" class="btn btn-primary" onclick="startGenerate()" style="flex: 1;">✨
+                                生成数据集 (Generate)</button>
+                            <button id="btnExportZip" class="btn btn-secondary" onclick="openExportZipModal()"
+                                style="flex: 1; border-color: #00897B; color: #00897B; background: rgba(0, 137, 123, 0.05);">
+                                导出 ZIP
+                            </button>
                         </div>
+                        <div id="statusMessage"
+                            style="text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-sub); height: 20px;">
+                        </div>
+                        <!-- Status Grid -->
+
                     </div>
                     <div class="card" style="flex: 0;">
                         <div class="card-header"><span>执行控制</span></div>
@@ -1604,6 +1622,57 @@
             </div>
         </div>
 
+        <!-- View: ONNX Manager -->
+        <div id="view-onnx" class="view-container">
+            <div class="config-layout">
+                <!-- Left Column: Project Selector -->
+                <div class="panel-col" style="width: 320px;">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>ONNX 项目池</span>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-primary btn-icon" onclick="openCreateOnnxProjectModal()" title="新建项目" style="padding:4px; width:28px; height:28px;">+</button>
+                                <button class="btn btn-secondary btn-icon" onclick="loadOnnxProjects()" title="刷新项目" style="padding:4px; width:28px; height:28px;">🔄</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:20px;">
+                            <label class="form-label">当前项目 (Project)</label>
+                            <select id="onnxProjectSelect" class="form-control" onchange="loadOnnxModels()">
+                                <option value="">正在加载...</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 24px;">
+                            <button class="btn btn-danger" onclick="deleteOnnxProject()" style="width: 100%;">删除当前项目</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Column: ONNX File List -->
+                <div class="panel-col">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>ONNX 模型列表</span>
+                        </div>
+                        <div class="checklist-container" style="padding: 0; background: #fff;">
+                            <table class="training-table">
+                                <thead>
+                                    <tr>
+                                        <th>模型名称 (File Name)</th>
+                                        <th style="width: 100px;">大小 (Size)</th>
+                                        <th style="width: 150px;">修改时间 (Date)</th>
+                                        <th style="width: 100px; text-align: center;">版本状态</th>
+                                        <th style="width: 60px; text-align: center;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="onnxListBody">
+                                    <tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">请选择项目</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- View: Labeling (SAM2) -->
         <div id="view-labeling" class="view-container">
             <div class="labeling-layout">
@@ -1766,6 +1835,27 @@
                     class="btn btn-primary" onclick="createProject()">创建</button></div>
         </div>
     </div>
+    <!-- Create ONNX Project Modal -->
+    <div id="createOnnxProjectModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--text-main);">新建 ONNX 项目</h3>
+            <div class="form-group">
+                <label class="form-label">项目名称 (Name)</label>
+                <input type="text" id="newOnnxProjectName" class="form-control" placeholder="例如: Screw Models">
+            </div>
+            <div class="form-group">
+                <label class="form-label">模型所在目录 (Root Path)</label>
+                <div class="input-group">
+                    <input type="text" id="newOnnxProjectRoot" class="form-control" readonly placeholder="选择包含 .onnx 的文件夹...">
+                    <button class="btn btn-secondary" onclick="selectFolder('newOnnxProjectRoot')">📁</button>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button class="btn btn-secondary" onclick="closeCreateOnnxProjectModal()">取消</button>
+                <button class="btn btn-primary" onclick="createOnnxProject()">创建</button>
+            </div>
+        </div>
+    </div>
     <!-- Modals -->
     <div id="augmentModal" class="modal">
         <div class="modal-box">
@@ -1796,6 +1886,82 @@
             <div style="display: flex; justify-content: flex-end; gap: 12px;"><button class="btn btn-secondary"
                     onclick="closeAugmentModal()">取消</button><button class="btn btn-primary"
                     onclick="startAugmentation()">开始生成</button></div>
+        </div>
+    </div>
+    <div id="exportZipModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 20px; color: var(--text-main);">导出 YOLO 数据集 ZIP</h3>
+
+            <div class="form-group">
+                <label class="form-label">数据源文件夹</label>
+                <div id="exportDataSourceList" class="checklist-container">
+                    <div style="padding: 20px; text-align: center; color: #aab8c2;">请先选择项目并加载子文件夹</div>
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">YOLO 版本</label>
+                    <select id="exportYoloVersion" class="form-control">
+                        <option value="yolov8" selected>YOLOv8</option>
+                        <option value="yolo11">YOLO11</option>
+                        <option value="yolo26">YOLO26</option>
+                        <option value="yolov9">YOLOv9</option>
+                        <option value="yolov10">YOLOv10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">模型尺寸</label>
+                    <select id="exportModelSize" class="form-control">
+                        <option value="n">n (Nano)</option>
+                        <option value="s" selected>s (Small)</option>
+                        <option value="m">m (Medium)</option>
+                        <option value="l">l (Large)</option>
+                        <option value="x">x (X-Large)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">训练集比例 (%)</label>
+                    <input type="number" id="exportSplitRatio" class="form-control" min="50" max="95" step="5"
+                        value="80">
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">Epochs</label>
+                    <input type="number" id="exportEpochs" class="form-control" value="300" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Batch Size</label>
+                    <input type="number" id="exportBatchSize" class="form-control" value="16">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ImgSz</label>
+                    <input type="number" id="exportImgSize" class="form-control" value="640" step="32">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Patience</label>
+                    <input type="number" id="exportPatience" class="form-control" value="50" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Workers</label>
+                    <input type="number" id="exportWorkers" class="form-control" value="8" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">GPU Index</label>
+                    <input type="text" id="exportGpuIndex" class="form-control" value="0">
+                </div>
+            </div>
+
+            <p style="font-size: 12px; color: #7f8c8d; margin-top: 8px;">
+                导出内容包含 images/train、images/val、labels/train、labels/val、data.yaml、training_config.json、YOLO_train.ipynb
+            </p>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeExportZipModal()">取消</button>
+                <button class="btn btn-primary" onclick="startExportZip()">开始导出</button>
+            </div>
         </div>
     </div>
     <!-- Success Notification Toast -->
@@ -1844,6 +2010,15 @@
                     if (typeof loadTrainingHistory === 'function') loadTrainingHistory();
                 }
 
+                if (viewId === 'onnx') {
+                    const selectOnnx = document.getElementById('onnxProjectSelect');
+                    if(selectOnnx && selectOnnx.options.length === 0) {
+                        loadOnnxProjects();
+                    } else {
+                        loadOnnxModels();
+                    }
+                }
+
                 if (viewId === 'labeling') {
                     // 请求可用模型列表
                     window.chrome.webview.postMessage(JSON.stringify({ action: 'get_sam_models' }));
@@ -1883,6 +2058,160 @@
                 window.chrome.webview.postMessage(JSON.stringify({
                     action: 'get_subfolders',
                     path: currentProjectConfig.RootPath
+                }));
+            }
+        }
+
+        let currentOnnxProjects = [];
+
+        function loadOnnxProjects() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_onnx_projects'
+            }));
+        }
+
+        function updateOnnxProjectList(projects) {
+            currentOnnxProjects = projects;
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select) return;
+            select.innerHTML = '';
+
+            projects.forEach((p, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = p.Name;
+                select.appendChild(opt);
+            });
+
+            if (projects.length > 0) {
+                loadOnnxModels();
+            } else {
+                document.getElementById('onnxListBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">尚未创建或发现可用的 ONNX 项目</td></tr>';
+            }
+        }
+
+        function loadOnnxModels() {
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select || select.selectedIndex < 0) return;
+            const project = currentOnnxProjects[select.selectedIndex];
+            if(!project) return;
+            
+            document.getElementById('onnxListBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">加载中...</td></tr>';
+            
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_onnx_models',
+                projectName: project.Name
+            }));
+        }
+
+        function renderOnnxModels(models) {
+            const tbody = document.getElementById('onnxListBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            if(!models || models.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">该目录下暂无 ONNX 模型数据</td></tr>';
+                return;
+            }
+            models.forEach((model, index) => {
+                const tr = document.createElement('tr');
+                const isLatest = index === 0;
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = model.Name || '';
+                nameCell.style.fontWeight = isLatest ? '600' : 'normal';
+                nameCell.style.color = isLatest ? 'var(--primary-dark)' : 'var(--text-main)';
+                nameCell.style.fontSize = '14px';
+
+                const sizeCell = document.createElement('td');
+                const sizeBytes = Number(model.SizeBytes) || 0;
+                sizeCell.textContent = `${(sizeBytes / 1024 / 1024).toFixed(2)} MB`;
+                sizeCell.style.color = 'var(--text-sub)';
+                sizeCell.style.fontSize = '13px';
+
+                const dateCell = document.createElement('td');
+                dateCell.textContent = model.LastWriteTime || '';
+                dateCell.style.color = 'var(--text-sub)';
+                dateCell.style.fontFamily = 'Consolas, monospace';
+                dateCell.style.fontSize = '13px';
+
+                const statusCell = document.createElement('td');
+                statusCell.style.textAlign = 'center';
+                const statusBadge = document.createElement('span');
+                statusBadge.textContent = isLatest ? 'Latest' : 'Archived';
+                statusBadge.style.fontSize = '12px';
+                if (isLatest) {
+                    statusBadge.style.background = 'var(--success)';
+                    statusBadge.style.color = 'white';
+                    statusBadge.style.padding = '4px 10px';
+                    statusBadge.style.borderRadius = '12px';
+                    statusBadge.style.fontWeight = '700';
+                    statusBadge.style.display = 'inline-block';
+                    statusBadge.style.boxShadow = '0 2px 4px rgba(16,185,129,0.3)';
+                } else {
+                    statusBadge.style.color = 'var(--text-sub)';
+                }
+                statusCell.appendChild(statusBadge);
+
+                const actionCell = document.createElement('td');
+                actionCell.style.textAlign = 'center';
+                const openBtn = document.createElement('button');
+                openBtn.className = 'btn btn-secondary btn-icon';
+                openBtn.title = '打开所在位置';
+                openBtn.textContent = '📁';
+                openBtn.style.padding = '4px';
+                openBtn.style.width = '28px';
+                openBtn.style.height = '28px';
+                openBtn.addEventListener('click', () => {
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'open_model_folder',
+                        path: model.FullPath || ''
+                    }));
+                });
+                actionCell.appendChild(openBtn);
+
+                tr.appendChild(nameCell);
+                tr.appendChild(sizeCell);
+                tr.appendChild(dateCell);
+                tr.appendChild(statusCell);
+                tr.appendChild(actionCell);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openCreateOnnxProjectModal() {
+            document.getElementById('createOnnxProjectModal').style.display = 'flex';
+        }
+
+        function closeCreateOnnxProjectModal() {
+            document.getElementById('createOnnxProjectModal').style.display = 'none';
+        }
+
+        function createOnnxProject() {
+            const name = document.getElementById('newOnnxProjectName').value;
+            const root = document.getElementById('newOnnxProjectRoot').value;
+
+            if (!name || !root) {
+                showMiniToast('warning', '提示', '项目名称和根目录不能为空');
+                return;
+            }
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'create_onnx_project',
+                name: name,
+                rootPath: root
+            }));
+
+            closeCreateOnnxProjectModal();
+        }
+
+        function deleteOnnxProject() {
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select || select.selectedIndex < 0) return;
+
+            if (confirm('确定要从列表移除当前 ONNX 项目吗？此操作不会删除硬盘文件。')) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_onnx_project',
+                    index: select.selectedIndex
                 }));
             }
         }
@@ -1954,8 +2283,40 @@
                 updateSubFolders(data.folders);
             }
 
+            else if (data.action === 'onnx_projects_loaded') {
+                updateOnnxProjectList(data.projects);
+            }
+
+            else if (data.action === 'onnx_models_loaded') {
+                renderOnnxModels(data.models);
+            }
+
             else if (data.action === 'log') {
                 addLog(data.message, data.type);
+            }
+
+            else if (data.action === 'export_zip_progress') {
+                updateProgress(data.progress, 'ZIP 导出中...');
+            }
+
+            else if (data.action === 'export_zip_complete') {
+                updateProgress(100, 'ZIP 导出完成');
+                showSuccessToast(data.path, 'ZIP 导出成功');
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
+                addLog(`ZIP 导出完成: ${data.path}`, 'success');
+                setTimeout(() => { updateProgress(0, 'Ready'); }, 5000);
+            }
+
+            else if (data.action === 'export_zip_cancelled') {
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
+                updateProgress(0, '已取消导出');
+                addLog('用户已取消 ZIP 导出', 'warning');
             }
 
             else if (data.action === 'training_data') {
@@ -1982,6 +2343,7 @@
                 else if (data.type === 'augmentSource') document.getElementById('augmentSourcePath').value = data.path;
                 else if (data.type === 'holeAssets') document.getElementById('holeAssetsPath').value = data.path;
                 else if (data.type === 'newProjectRoot') document.getElementById('newProjectRoot').value = data.path;
+                else if (data.type === 'newOnnxProjectRoot') document.getElementById('newOnnxProjectRoot').value = data.path;
                 else if (data.type === 'toolSource') document.getElementById('toolSourcePath').value = data.path;
                 else if (data.type === 'toolTarget') document.getElementById('toolTargetPath').value = data.path;
                 else if (data.type === 'modelStorage') {
@@ -2043,6 +2405,10 @@
             else if (data.action === 'error') {
                 showMiniToast('error', '出错了', data.message, 'error');
                 addLog(data.message, 'error');
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
             }
 
             else if (data.action === 'training_history_loaded') {
@@ -2318,6 +2684,28 @@
                     const s = Math.floor(remaining % 60);
 
                     document.getElementById('progressETA').innerText = `ETA: ${m}m ${s}s`;
+                }
+            }
+        }
+
+        function updateProgress(progress, statusText = '') {
+            const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+            const pct = Math.round(safeProgress) + '%';
+
+            const fill = document.getElementById('progressFill');
+            if (fill) {
+                fill.style.width = pct;
+            }
+
+            const percent = document.getElementById('progressPercent');
+            if (percent) {
+                percent.innerText = pct;
+            }
+
+            if (statusText) {
+                const status = document.getElementById('progressStatus');
+                if (status) {
+                    status.innerText = statusText;
                 }
             }
         }
@@ -2840,6 +3228,159 @@
             };
 
             window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function inferYoloVersionFromModelSize(modelSizeValue) {
+            if (!modelSizeValue) return 'yolov8';
+            if (modelSizeValue.startsWith('v26')) return 'yolo26';
+            if (modelSizeValue.startsWith('v11')) return 'yolo11';
+            return 'yolov8';
+        }
+
+        function inferModelSizeCode(modelSizeValue) {
+            if (!modelSizeValue || modelSizeValue.length < 2) return 's';
+            return modelSizeValue.slice(-1).toLowerCase();
+        }
+
+        function openExportZipModal() {
+            if (!currentProjectConfig) {
+                showMiniToast('warning', '提示', '请先选择项目');
+                return;
+            }
+
+            const modal = document.getElementById('exportZipModal');
+            const exportListDiv = document.getElementById('exportDataSourceList');
+            if (!modal || !exportListDiv) {
+                console.error('Export ZIP modal elements are missing in DOM.');
+                showMiniToast('error', '界面错误', '导出弹窗未正确加载，请重启后重试');
+                return;
+            }
+
+            const mainCheckboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]');
+            exportListDiv.innerHTML = '';
+
+            if (mainCheckboxes.length === 0) {
+                exportListDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">当前项目下未发现可选子文件夹</div>';
+            } else {
+                mainCheckboxes.forEach((cb, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'checklist-item';
+
+                    const id = 'export_cb_' + i;
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = id;
+                    input.value = cb.value;
+                    input.checked = cb.checked;
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', id);
+                    label.innerText = cb.value;
+
+                    item.appendChild(input);
+                    item.appendChild(label);
+                    exportListDiv.appendChild(item);
+                });
+            }
+
+            // 默认同步当前训练参数
+            const modelSizeMain = document.getElementById('modelSize');
+            const epochsMain = document.getElementById('epochs');
+            const batchMain = document.getElementById('batchSize');
+            const imgMain = document.getElementById('imgSize');
+            const patienceMain = document.getElementById('patience');
+            const workersMain = document.getElementById('workers');
+            const gpuMain = document.getElementById('gpuIndex');
+
+            const exportYoloVersion = document.getElementById('exportYoloVersion');
+            const exportModelSize = document.getElementById('exportModelSize');
+            const exportEpochs = document.getElementById('exportEpochs');
+            const exportBatchSize = document.getElementById('exportBatchSize');
+            const exportImgSize = document.getElementById('exportImgSize');
+            const exportPatience = document.getElementById('exportPatience');
+            const exportWorkers = document.getElementById('exportWorkers');
+            const exportGpuIndex = document.getElementById('exportGpuIndex');
+
+            const modelSizeVal = modelSizeMain ? modelSizeMain.value : 'v8s';
+            if (exportYoloVersion) exportYoloVersion.value = inferYoloVersionFromModelSize(modelSizeVal);
+            if (exportModelSize) exportModelSize.value = inferModelSizeCode(modelSizeVal);
+            if (exportEpochs && epochsMain) exportEpochs.value = epochsMain.value;
+            if (exportBatchSize && batchMain) exportBatchSize.value = batchMain.value;
+            if (exportImgSize && imgMain) exportImgSize.value = imgMain.value;
+            if (exportPatience && patienceMain) exportPatience.value = patienceMain.value;
+            if (exportWorkers && workersMain) exportWorkers.value = workersMain.value;
+            if (exportGpuIndex && gpuMain) exportGpuIndex.value = gpuMain.value;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeExportZipModal() {
+            const modal = document.getElementById('exportZipModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function startExportZip() {
+            if (!currentProjectConfig) return;
+
+            const yoloVersionInput = document.getElementById('exportYoloVersion');
+            const modelSizeInput = document.getElementById('exportModelSize');
+            const splitRatioInput = document.getElementById('exportSplitRatio');
+            const epochsInput = document.getElementById('exportEpochs');
+            const batchInput = document.getElementById('exportBatchSize');
+            const imgInput = document.getElementById('exportImgSize');
+            const patienceInput = document.getElementById('exportPatience');
+            const workersInput = document.getElementById('exportWorkers');
+            const gpuInput = document.getElementById('exportGpuIndex');
+            if (!yoloVersionInput || !modelSizeInput || !splitRatioInput || !epochsInput || !batchInput || !imgInput || !patienceInput || !workersInput || !gpuInput) {
+                showMiniToast('error', '界面错误', '导出参数控件缺失');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('#exportDataSourceList input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                showMiniToast('warning', '提示', '请至少勾选一个数据源文件夹');
+                return;
+            }
+
+            const sourcePaths = Array.from(checkboxes).map(cb => `${currentProjectConfig.RootPath}\\${cb.value}`);
+            const splitRatioValue = parseInt(splitRatioInput.value, 10);
+            const splitRatio = Number.isFinite(splitRatioValue) ? splitRatioValue / 100.0 : 0.8;
+            const epochs = parseInt(epochsInput.value, 10);
+            const batchSize = parseInt(batchInput.value, 10);
+            const imgSize = parseInt(imgInput.value, 10);
+            const patience = parseInt(patienceInput.value, 10);
+            const workers = parseInt(workersInput.value, 10);
+            const gpuIndex = gpuInput.value || "0";
+
+            const conf = {
+                action: 'export_dataset_zip',
+                sourcePaths: sourcePaths,
+                yoloVersion: yoloVersionInput.value,
+                modelSize: modelSizeInput.value,
+                epochs: Number.isFinite(epochs) ? epochs : 300,
+                batchSize: Number.isFinite(batchSize) ? batchSize : 16,
+                imgSize: Number.isFinite(imgSize) ? imgSize : 640,
+                patience: Number.isFinite(patience) ? patience : 50,
+                workers: Number.isFinite(workers) ? workers : 8,
+                gpuIndex: gpuIndex,
+                splitRatio: splitRatio,
+                classes: currentProjectConfig.Classes,
+                projectName: currentProjectConfig.Name
+            };
+
+            updateProgress(0, '正在初始化 ZIP 导出...');
+            addLog('准备导出 YOLO 数据集 ZIP...', 'info');
+            switchTab('config');
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+            closeExportZipModal();
+
+            const exportBtn = document.getElementById('btnExportZip');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+            }
         }
 
         // Helper

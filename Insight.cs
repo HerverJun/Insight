@@ -160,7 +160,7 @@ namespace Insight
                             var folderType = typeElement.GetString();
                             if (!string.IsNullOrEmpty(folderType))
                             {
-                                this.Invoke(() => HandleSelectFolder(folderType));
+                                this.BeginInvoke(() => HandleSelectFolder(folderType));
                             }
                         }
                         break;
@@ -168,7 +168,10 @@ namespace Insight
                         if (root.TryGetProperty("type", out var fileTypeElement))
                         {
                             var fileType = fileTypeElement.GetString();
-                            this.Invoke(() => HandleSelectFile(fileType));
+                            if (!string.IsNullOrEmpty(fileType))
+                            {
+                                this.BeginInvoke(() => HandleSelectFile(fileType));
+                            }
                         }
                         break;
                     case "generate":
@@ -179,6 +182,9 @@ namespace Insight
                         break;
                     case "stop_training":
                         HandleStopTraining();
+                        break;
+                    case "export_dataset_zip":
+                        this.BeginInvoke(() => HandleExportDatasetZip(root.Clone()));
                         break;
                     case "open_output":
                         HandleOpenOutput(root);
@@ -205,6 +211,19 @@ namespace Insight
                             var sub = ProjectManager.GetSubFolders(pathProp.GetString()!);
                             SendToFrontend(new { action = "subfolders_loaded", folders = sub });
                         }
+                        break;
+                    case "get_onnx_projects":
+                        var onnxProjects = OnnxProjectManager.LoadProjects();
+                        SendToFrontend(new { action = "onnx_projects_loaded", projects = onnxProjects });
+                        break;
+                    case "create_onnx_project":
+                        HandleCreateOnnxProject(root);
+                        break;
+                    case "delete_onnx_project":
+                        HandleDeleteOnnxProject(root);
+                        break;
+                    case "get_onnx_models":
+                        HandleGetOnnxModels(root);
                         break;
                     case "get_sam_models":
                         HandleGetSAMModels();
@@ -622,6 +641,89 @@ namespace Insight
             }
         }
 
+        private async void HandleExportDatasetZip(JsonElement data)
+        {
+            try
+            {
+                var sourcePaths = data.GetProperty("sourcePaths").EnumerateArray().Select(x => x.GetString()!).ToList();
+                var yoloVersion = data.GetProperty("yoloVersion").GetString() ?? "yolov8";
+                var modelSize = data.TryGetProperty("modelSize", out var modelSizeProp) ? modelSizeProp.GetString() ?? "n" : "n";
+                var epochs = data.TryGetProperty("epochs", out var epochsProp) && epochsProp.ValueKind == JsonValueKind.Number ? epochsProp.GetInt32() : 300;
+                var batchSize = data.TryGetProperty("batchSize", out var batchProp) && batchProp.ValueKind == JsonValueKind.Number ? batchProp.GetInt32() : 16;
+                var imgSize = data.TryGetProperty("imgSize", out var imgProp) && imgProp.ValueKind == JsonValueKind.Number ? imgProp.GetInt32() : 640;
+                var patience = data.TryGetProperty("patience", out var patProp) && patProp.ValueKind == JsonValueKind.Number ? patProp.GetInt32() : 50;
+                var workers = data.TryGetProperty("workers", out var workersProp) && workersProp.ValueKind == JsonValueKind.Number ? workersProp.GetInt32() : 8;
+                var gpuIndex = data.TryGetProperty("gpuIndex", out var gpuProp) ? gpuProp.GetString() ?? "0" : "0";
+                var splitRatio = data.GetProperty("splitRatio").GetDouble();
+                var classes = data.GetProperty("classes").EnumerateArray().Select(x => x.GetString()!).ToList();
+                var projectName = data.TryGetProperty("projectName", out var pName) ? pName.GetString() : "Untitled";
+
+                if (sourcePaths.Count == 0)
+                {
+                    SendError("请至少选择一个数据集文件夹");
+                    return;
+                }
+
+                // 选择保存路径
+                string targetZipPath = string.Empty;
+                this.Invoke(() =>
+                {
+                    using var sfd = new SaveFileDialog();
+                    sfd.Filter = "ZIP Compression (*.zip)|*.zip";
+                    sfd.Title = "导出并保存 YOLO 训练数据集 ZIP";
+                    sfd.FileName = $"{projectName}_{yoloVersion}_dataset.zip";
+
+                    if (sfd.ShowDialog(this) == DialogResult.OK)
+                    {
+                        targetZipPath = sfd.FileName;
+                    }
+                });
+
+                if (string.IsNullOrEmpty(targetZipPath))
+                {
+                    // 用户取消
+                    SendToFrontend(new { action = "export_zip_cancelled" });
+                    return;
+                }
+
+                await Task.Run(async () =>
+                {
+                    try
+                    {
+                        await YoloDatasetExporter.ExportToZipAsync(
+                            sourcePaths: sourcePaths,
+                            targetZipPath: targetZipPath,
+                            classes: classes,
+                            yoloVersion: yoloVersion,
+                            modelSize: modelSize,
+                            epochs: epochs,
+                            batchSize: batchSize,
+                            imgSize: imgSize,
+                            patience: patience,
+                            workers: workers,
+                            gpuIndex: gpuIndex,
+                            splitRatio: splitRatio,
+                            onLog: (msg, type) => SendLog(msg, type),
+                            onProgress: (progress) =>
+                            {
+                                SendToFrontend(new { action = "export_zip_progress", progress = progress });
+                            }
+                        );
+
+                        SendToFrontend(new { action = "export_zip_complete", path = targetZipPath });
+                    }
+                    catch (Exception ex)
+                    {
+                        SendError($"导出 ZIP 失败: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                SendError($"参数解析失败: {ex.Message}");
+            }
+        }
+
         private List<string> ScanClasses(string sourcePath)
         {
             var classes = new HashSet<string>();
@@ -860,9 +962,10 @@ head:
 
         private void GenerateTrainCommand(string targetPath, TrainingParams p)
         {
-            // 解析模型版本和大小 (v8s -> yolov8s, v11m -> yolo11m)
+            // 解析模型版本和大小 (v8s -> yolov8s, v11m -> yolo11m, v26s -> yolo26s)
             var modelVersion = p.ModelSize.StartsWith("v26") ? "yolo26"
                              : p.ModelSize.StartsWith("v11") ? "yolo11"
+                             : p.ModelSize.StartsWith("v8") ? "yolov8"
                              : "yolov8";
             var sizeCode = p.ModelSize.Length > 2 ? p.ModelSize.Substring(p.ModelSize.Length - 1) : "s";
             var modelName = p.EnableP2 ? $"{modelVersion}{sizeCode}-p2.yaml" : $"{modelVersion}{sizeCode}.pt";
@@ -1199,7 +1302,7 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                 // 必须在 UI 线程上调用 PostWebMessageAsString
                 if (this.InvokeRequired)
                 {
-                    this.Invoke(() =>
+                    this.BeginInvoke(() =>
                     {
                         if (webView21.CoreWebView2 != null)
                         {
@@ -2165,6 +2268,105 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
             catch (Exception ex)
             {
                 SendError($"加载图片数据失败: {ex.Message}");
+            }
+        }
+
+        private void HandleCreateOnnxProject(JsonElement data)
+        {
+            try
+            {
+                var name = data.GetProperty("name").GetString();
+                var rootPath = data.GetProperty("rootPath").GetString();
+
+                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(rootPath))
+                {
+                    SendError("ONNX 项目名称和根目录不能为空");
+                    return;
+                }
+
+                if (!Directory.Exists(rootPath))
+                {
+                    SendError("指定的根目录不存在");
+                    return;
+                }
+
+                var newProject = new OnnxProjectConfig
+                {
+                    Name = name,
+                    RootPath = rootPath
+                };
+
+                OnnxProjectManager.AddProject(newProject);
+
+                // Refresh list
+                var projects = OnnxProjectManager.LoadProjects();
+                SendToFrontend(new { action = "onnx_projects_loaded", projects });
+                SendComplete("ONNX 项目创建成功！");
+            }
+            catch (Exception ex)
+            {
+                SendError($"创建 ONNX 项目失败: {ex.Message}");
+            }
+        }
+
+        private void HandleDeleteOnnxProject(JsonElement data)
+        {
+            try
+            {
+                if (data.TryGetProperty("index", out var indexProp))
+                {
+                    OnnxProjectManager.DeleteProject(indexProp.GetInt32());
+                    var projects = OnnxProjectManager.LoadProjects();
+                    SendToFrontend(new { action = "onnx_projects_loaded", projects });
+                }
+            }
+            catch (Exception ex)
+            {
+                SendError($"删除分离 ONNX 项目失败: {ex.Message}");
+            }
+        }
+
+        private void HandleGetOnnxModels(JsonElement root)
+        {
+            try
+            {
+                if (!root.TryGetProperty("projectName", out var nameProp)) return;
+                var projectName = nameProp.GetString();
+                if (string.IsNullOrEmpty(projectName)) return;
+
+                var project = OnnxProjectManager.LoadProjects().FirstOrDefault(p => p.Name == projectName);
+                if (project == null)
+                {
+                    SendToFrontend(new { action = "onnx_models_loaded", models = new object[0] });
+                    return;
+                }
+
+                string modelPath = project.RootPath;
+
+                if (!Directory.Exists(modelPath))
+                {
+                    SendToFrontend(new { action = "onnx_models_loaded", models = new object[0] });
+                    return;
+                }
+
+                // 获取所有 .onnx 文件
+                var files = Directory.GetFiles(modelPath, "*.onnx", SearchOption.AllDirectories)
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.LastWriteTime)
+                    .Select(f => new
+                    {
+                        Name = f.Name,
+                        SizeBytes = f.Length,
+                        LastWriteTime = f.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                        FullPath = f.FullName
+                    })
+                    .ToList();
+
+                SendToFrontend(new { action = "onnx_models_loaded", models = files });
+            }
+            catch (Exception ex)
+            {
+                SendError($"Failed to load ONNX models: {ex.Message}");
             }
         }
     }
