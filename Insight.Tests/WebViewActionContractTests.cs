@@ -1,17 +1,19 @@
 using System.Text.RegularExpressions;
+using Insight.Bridge;
+using Insight.Handlers;
+using Insight.Services;
 
 namespace Insight.Tests;
 
 public class WebViewActionContractTests
 {
     [Fact]
-    public void FrontendActionsMatchBackendMessageHandlers()
+    public void FrontendActionsMatchKnownProtocolActions()
     {
         var root = FindRepositoryRoot();
-        var backendSource = File.ReadAllText(Path.Combine(root, "Insight.cs"));
         var frontendSource = File.ReadAllText(Path.Combine(root, "index.html"));
 
-        var backendActions = ExtractBackendActions(backendSource);
+        var backendActions = ToSortedSet(WebViewActions.Incoming);
         var frontendActions = ExtractFrontendActions(frontendSource);
 
         Assert.NotEmpty(backendActions);
@@ -21,9 +23,32 @@ public class WebViewActionContractTests
         Assert.Equal(backendActions, frontendActions);
     }
 
-    private static SortedSet<string> ExtractBackendActions(string source)
+    [Fact]
+    public void DispatcherRegistryCoversEveryKnownProtocolAction()
     {
-        return ExtractMatches(source, "case\\s+\"([^\"]+)\"\\s*:");
+        var messenger = new RecordingFrontendMessenger();
+        var ui = new ImmediateUiDispatcher();
+        using var app = new InsightApplication(messenger, ui, new NullDialogService());
+        var dispatcher = WebViewCompositionRoot.CreateDispatcher(app, messenger);
+
+        var expected = ToSortedSet(WebViewActions.Incoming);
+        var registered = ToSortedSet(dispatcher.RegisteredActions);
+
+        Assert.Equal(expected, registered);
+        Assert.Equal(registered.Count, dispatcher.RegisteredActions.Count);
+    }
+
+    [Fact]
+    public async Task DispatcherReportsUnknownActionsWithoutThrowing()
+    {
+        var messenger = new RecordingFrontendMessenger();
+        var ui = new ImmediateUiDispatcher();
+        using var app = new InsightApplication(messenger, ui, new NullDialogService());
+        var dispatcher = WebViewCompositionRoot.CreateDispatcher(app, messenger);
+
+        await dispatcher.DispatchAsync("""{"action":"unknown_action"}""", CancellationToken.None);
+
+        Assert.Contains(messenger.Errors, error => error.Contains("未知前端指令"));
     }
 
     private static SortedSet<string> ExtractFrontendActions(string source)
@@ -36,6 +61,11 @@ public class WebViewActionContractTests
         var values = Regex.Matches(source, pattern)
             .Select(match => match.Groups[1].Value);
 
+        return ToSortedSet(values);
+    }
+
+    private static SortedSet<string> ToSortedSet(IEnumerable<string> values)
+    {
         return new SortedSet<string>(values, StringComparer.Ordinal);
     }
 
@@ -58,5 +88,52 @@ public class WebViewActionContractTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the InsightV4 repository root.");
+    }
+
+    private sealed class RecordingFrontendMessenger : IFrontendMessenger
+    {
+        public List<object> Messages { get; } = new();
+        public List<string> Errors { get; } = new();
+
+        public void Send(object data)
+        {
+            Messages.Add(data);
+        }
+
+        public void Log(string message, string type = "info")
+        {
+            Messages.Add(new { action = "log", message, type });
+        }
+
+        public void Error(string message)
+        {
+            Errors.Add(message);
+            Messages.Add(new { action = "error", message });
+        }
+
+        public void Complete(string message)
+        {
+            Messages.Add(new { action = "complete", message });
+        }
+    }
+
+    private sealed class ImmediateUiDispatcher : IUiDispatcher
+    {
+        public bool InvokeRequired => false;
+
+        public void Post(Action action) => action();
+        public void Invoke(Action action) => action();
+        public T Invoke<T>(Func<T> action) => action();
+    }
+
+    private sealed class NullDialogService : IAppDialogService
+    {
+        public string? SelectFolder(string type) => null;
+        public string? SelectPythonFile(string type) => null;
+        public string? SelectDatasetZipPath(string? projectName, string yoloVersion) => null;
+        public void ShowWarning(string message, string title) { }
+        public void ShowError(string message, string title) { }
+        public void OpenFolder(string path) { }
+        public void OpenFileInExplorer(string path) { }
     }
 }
