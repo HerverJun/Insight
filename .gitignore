@@ -1,0 +1,54 @@
+# Visual Studio / IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+PublishOutput/
+dist/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.broken_*
+build_output.txt
+build_log.txt
+fix_log.txt
+
+# Archives
+*.zip
+*.rar
+*.7z
+
+# Model and training artifacts
+models/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.weights
+runs/
+datasets/
+training_history.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# NuGet
+*.nupkg
+packages/

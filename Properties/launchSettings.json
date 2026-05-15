@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Insight": {
+      "commandName": "Project",
+      "executablePath": "$(OutputPath)/Insight.exe",
+      "workingDirectory": "$(ProjectDir)",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

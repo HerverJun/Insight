@@ -1,0 +1,4402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insight · 秋毫V4</title>
+    <style>
+        :root {
+            /* 核心色板 - 雅韵 (Elegant Ink) - 2.0 */
+            --primary: #00897B;
+            --primary-light: #4DB6AC;
+            --primary-dark: #004D40;
+            --primary-accent: #00BFA5;
+            /* 琉璃青 (Glazed Blue) */
+            --gold-accent: #C9A962;
+            /* 鎏金 (Gold Thread) */
+
+            /* Backgrounds */
+            --bg-body: #F4F6F8;
+            --bg-card: #FFFFFF;
+            --bg-subtle: #F8FAFC;
+
+            /* Text */
+            --text-main: #1F2937;
+            /* 墨灰 */
+            --text-sub: #64748B;
+            /* 石板灰 */
+            --text-light: #94A3B8;
+
+            /* Functional */
+            --border-color: #E2E8F0;
+            --border-hover: #CBD5E1;
+            /* 多层彩色阴影系统 */
+            --shadow-sm: 0 1px 2px rgba(0, 137, 123, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 137, 123, 0.05), 0 2px 4px -1px rgba(0, 137, 123, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 137, 123, 0.08), 0 4px 6px -2px rgba(0, 137, 123, 0.04);
+            --shadow-glow: 0 0 20px rgba(0, 137, 123, 0.15);
+
+            --sidebar-width: 260px;
+
+            /* Status */
+            --danger: #EF4444;
+            --success: #10B981;
+            --warning: #F59E0B;
+
+            /* Transitions */
+            --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --ease-elastic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* 字体优化 */
+            font-family: "Inter", "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            /* 宣纸纹理 + 动态光晕 */
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(0, 137, 123, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(201, 169, 98, 0.05) 0%, transparent 50%),
+                url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='1'/%3E%3Ccircle cx='13' cy='13' r='1'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Sidebar Styles - 简约雅致 (Elegant Simple) */
+        /* Sidebar Styles - 清新层次 (Clean Layer) */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            flex-direction: column;
+            padding: 32px 24px;
+            z-index: 10;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.015);
+        }
+
+        .brand {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 48px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s var(--ease-out);
+            color: var(--text-sub);
+            font-weight: 500;
+            font-size: 14px;
+            background: transparent;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 137, 123, 0.04);
+            color: var(--primary);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: rgba(0, 137, 123, 0.08);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* 选中时的左侧指示条 (可选设计，这里用背景色区分已足够，或者加一个小圆点) */
+        /*
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 0 4px 4px 0;
+        }
+        */
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-item:hover .nav-icon {
+            transform: rotate(5deg);
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+            position: relative;
+            background: transparent;
+            /* 透明背景，透出body的宣纸纹理 */
+        }
+
+        /* Custom Scrollbar */
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .main-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 4px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb {
+            background: #B0BEC5;
+            border-radius: 4px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
+        }
+
+        .view-container {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            gap: 24px;
+            animation: fadeScale 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .view-container.active {
+            display: flex;
+        }
+
+        @keyframes fadeScale {
+            from {
+                opacity: 0;
+                transform: scale(0.99);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Configuration Layout */
+        .config-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            /* Fixed Left, Fluid Right */
+            gap: 24px;
+            height: 100%;
+        }
+
+        .panel-col {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            height: 100%;
+        }
+
+        /* Modern Cards - Elegant Style */
+        /* Modern Cards - Elegant Style */
+        .card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.9);
+            box-shadow: var(--shadow-lg);
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .card.fill-height {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .card-header {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            /* 竹青色装饰条 */
+            background: var(--primary);
+            border-radius: 2px;
+            margin-right: 12px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.6);
+            color: var(--text-main);
+            font-size: 14px;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            background: #FFFFFF;
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px var(--shadow-glow);
+        }
+
+        select.form-control {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Buttons - Elegant Style */
+        .btn {
+            border: 1px solid transparent;
+            cursor: pointer;
+            padding: 10px 22px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-accent));
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 137, 123, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 137, 123, 0.35);
+        }
+
+        .btn-secondary {
+            background: #FFFFFF;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #FAFAFA;
+        }
+
+        .btn-danger {
+            background: linear-gradient(145deg, #EF5350, #C62828);
+            color: white;
+            box-shadow: 0 2px 6px rgba(198, 40, 40, 0.2);
+        }
+
+        .btn-danger:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(198, 40, 40, 0.3);
+        }
+
+        .btn-icon {
+            padding: 10px;
+        }
+
+        /* Checklist */
+        .checklist-container {
+            border: 1px solid var(--border-color);
+            background: #FAFAFA;
+            border-radius: 8px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        /* Custom Scrollbar for Checklist */
+        .checklist-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .checklist-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 3px;
+        }
+
+        .checklist-container::-webkit-scrollbar-thumb {
+            background: #CFD8DC;
+            border-radius: 3px;
+        }
+
+        .checklist-container::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #FFFFFF;
+            border: 1px solid transparent;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+
+        .checklist-item:hover {
+            border-color: var(--primary-light);
+            background: #F0FDF4;
+            /* 极淡的绿色背景 */
+        }
+
+        .checklist-item input {
+            margin-right: 12px;
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item input:checked {
+            /* 浏览器默认行为即可，配合 accent-color */
+        }
+
+        .checklist-item label {
+            font-size: 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            flex: 1;
+        }
+
+        /* Grid for Params */
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+        }
+
+        /* Switches */
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #F9FAFB;
+            /* 浅灰背景 */
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .switch-row span {
+            white-space: nowrap;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+            /* 防止开关被压缩 */
+            margin-left: 12px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #CFD8DC;
+            transition: all 0.3s ease;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: all 0.3s ease;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked+.slider {
+            background: var(--primary);
+            box-shadow: none;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(18px);
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Monitor View - Elegant Theme */
+        .monitor-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .kpi-card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary-light);
+            box-shadow: 0 8px 20px rgba(0, 137, 123, 0.08);
+        }
+
+        .kpi-title {
+            font-size: 13px;
+            color: var(--text-sub);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 8px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            letter-spacing: -0.5px;
+            text-shadow: none;
+        }
+
+        .chart-row {
+            flex: 1;
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border-color);
+            min-height: 0;
+            position: relative;
+        }
+
+        .log-row {
+            height: 200px;
+            background: #263238;
+            /* 保持深色终端感，对比强烈 */
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .console-log {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: #CFD8DC;
+            background: transparent;
+        }
+
+        /* Custom Scrollbar for Console */
+        .console-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .console-log::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .console-log::-webkit-scrollbar-thumb {
+            background: #546E7A;
+            border-radius: 3px;
+        }
+
+        .status-header {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #B0BEC5;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Modal - Elegant Style */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(38, 50, 56, 0.6);
+            /* 深色遮罩 */
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: #FFFFFF;
+            width: 500px;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            border: none;
+            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Success Notification Toast - Elegant Style */
+        .success-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: #FFFFFF;
+            padding: 40px 60px;
+            border-radius: 16px;
+            z-index: 200;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 1px solid #E0E0E0;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .success-toast.show {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .success-toast-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            animation: bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: none;
+            /* 移除发光 */
+        }
+
+        .success-toast-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 12px;
+            text-shadow: none;
+        }
+
+        .success-toast-message {
+            font-size: 15px;
+            color: var(--text-sub);
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .success-toast-close {
+            background: var(--success);
+            border: none;
+            padding: 12px 40px;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(56, 142, 60, 0.2);
+        }
+
+        .success-toast-close:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(56, 142, 60, 0.3);
+            filter: brightness(1.1);
+        }
+
+        @keyframes bounce {
+            0% {
+                transform: scale(0);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .success-toast-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(38, 50, 56, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 199;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .success-toast-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Log Styles */
+        .log-item {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        .log-time {
+            color: #78909C;
+            margin-right: 10px;
+        }
+
+        .log-info {
+            color: #CFD8DC;
+        }
+
+        .log-error {
+            color: #EF5350;
+        }
+
+        .log-success {
+            color: #66BB6A;
+        }
+
+        .log-warning {
+            color: #FFA726;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            transition: width 0.3s ease;
+            background: var(--primary);
+            box-shadow: none;
+        }
+
+        /* Table Styles - Elegant Ledger */
+        .training-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            color: var(--text-main);
+            font-size: 14px;
+        }
+
+        .training-table th {
+            padding: 16px 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--border-color);
+            /* 加重标题线 */
+            color: var(--text-sub);
+            font-weight: 600;
+        }
+
+        .training-table td {
+            padding: 14px 12px;
+            border-bottom: 1px dashed var(--border-color);
+            /* 虚线分隔 */
+            transition: all 0.2s;
+        }
+
+        .training-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .training-table tr:hover td {
+            background: rgba(0, 137, 123, 0.03);
+            /* 极淡的青色悬停 */
+        }
+
+        /* Mini Toast - 右上角通知栏 */
+        .mini-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #00897B, #26A69A);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 24px rgba(0, 137, 123, 0.3);
+            transform: translateX(120%);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-width: 400px;
+        }
+
+        .mini-toast.show {
+            transform: translateX(0);
+        }
+
+        .mini-toast-icon {
+            font-size: 24px;
+        }
+
+        .mini-toast-content {
+            flex: 1;
+        }
+
+        .mini-toast-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .mini-toast-message {
+            font-size: 12px;
+            opacity: 0.9;
+            word-break: break-all;
+        }
+
+        /* ========== Phase 5: Animations & Micro-interactions ========== */
+
+        /* 1. View Transitions */
+        @keyframes fadeSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.99);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .view-container.active {
+            animation: fadeSlideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* 2. Staggered Entry Animations */
+        @keyframes staggerReveal {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .stagger-item {
+            opacity: 0;
+            /* Initially hidden */
+            animation: staggerReveal 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        /* 3. Enhanced Hover Effects */
+        .btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .checklist-item {
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item:hover {
+            transform: translateX(4px);
+            background: #F0FDF4;
+        }
+
+        .form-control:focus {
+            transform: translateY(-1px);
+        }
+
+        /* Labeling View Styles */
+        .labeling-layout {
+            display: flex;
+            gap: 16px;
+            height: 100%;
+        }
+
+        .labeling-sidebar {
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .labeling-panel {
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .labeling-canvas-area {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .labeling-toolbar {
+            height: 50px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 5;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            /* cursor: crosshair; set dynamicaly */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e0e0e0;
+            background-image:
+                linear-gradient(45deg, #ccc 25%, transparent 25%),
+                linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ccc 75%),
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        #labelingCanvas {
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+            /* canvas size handled by js */
+        }
+
+        .image-list-container {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .image-list-item {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-sub);
+            transition: all 0.2s;
+        }
+
+        .image-list-item:hover {
+            background: rgba(0, 137, 123, 0.05);
+            color: var(--primary);
+        }
+
+        .image-list-item.active {
+            background: rgba(0, 137, 123, 0.1);
+            color: var(--primary-dark);
+            font-weight: 600;
+            border-left: 3px solid var(--primary);
+        }
+
+        .image-list-item.done .status-icon {
+            color: var(--success);
+        }
+
+        .label-chip {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #FFFFFF;
+            margin-bottom: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            justify-content: space-between;
+        }
+
+        .label-chip:hover {
+            border-color: var(--border-hover);
+            transform: translateX(2px);
+        }
+
+        .label-chip.active {
+            border-color: var(--primary);
+            background: #E0F2F1;
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+
+        .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-main);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .toolbar-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 137, 123, 0.3);
+        }
+
+        .toolbar-info {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-light);
+            font-family: Consolas, monospace;
+        }
+
+        .toolbar-sep {
+            width: 1px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.1);
+            margin: 0 4px;
+        }
+
+        .shortcut-hint {
+            opacity: 0.6;
+            font-size: 11px;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <!-- Logo Icon as Linear SVG -->
+        <div class="brand">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            Insight · 秋毫
+        </div>
+        <div class="nav-menu">
+            <div class="nav-item active" onclick="switchTab('config')" id="nav-config">
+                <!-- Config Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+                <span>任务配置</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('monitor')" id="nav-monitor">
+                <!-- Monitor/Chart Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <span>训练监控</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('tools')" id="nav-tools">
+                <!-- Tools Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                    </path>
+                </svg>
+                <span>数据转换</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('labeling')" id="nav-labeling">
+                <!-- Labeling Icon (Bounding Box with Plus) -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                <span>智能标注</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('models')" id="nav-models">
+                <!-- Models/Archive Icon -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+                <span>训练历史</span>
+            </div>
+            <div class="nav-item" onclick="switchTab('onnx')" id="nav-onnx">
+                <!-- ONNX 图标 -->
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                    <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                    <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>ONNX管理</span>
+            </div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="font-size: 11px; color: var(--text-light); text-align: center; margin-top: 20px;">v2.1.0</div>
+    </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- View: Configuration -->
+        <div id="view-config" class="view-container active">
+            <div class="config-layout">
+                <!-- Left Column: Data Source Mgmt -->
+                <div class="panel-col">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>项目与数据源</span>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-icon" onclick="loadProjects()" title="刷新项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M23 4v6h-6"></path>
+                                        <path d="M1 20v-6h6"></path>
+                                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15">
+                                        </path>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-primary btn-icon" onclick="openCreateProjectModal()"
+                                    title="新建项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                </button>
+                                <button class="btn btn-danger btn-icon" onclick="deleteProject()" title="删除当前项目">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                        </path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group"><label class="form-label">当前项目 (Project)</label><select
+                                id="projectSelect" class="form-control" onchange="onProjectChanged()">
+                                <option value="">正在加载...</option>
+                            </select></div>
+                        <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+                            <label class="form-label">数据源加载 (Checklist)</label>
+                            <div id="dataSourceList" class="checklist-container">
+                                <div style="text-align: center; padding: 20px; color: #aaa; font-size: 13px;">
+                                    请选择项目 </div>
+                            </div>
+                        </div>
+                        <div class="form-group"><label class="form-label">输出路径 (Workspace)</label><input type="text"
+                                id="targetPath" class="form-control" readonly style="font-size: 12px; opacity: 0.8;">
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Column: Training Params -->
+                <div class="panel-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <span>YOLO 训练参数</span>
+                            <button class="btn btn-secondary" onclick="openAugmentModal()"
+                                style="font-size: 13px; padding: 6px 12px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <path
+                                        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                                    </path>
+                                </svg>
+                                缺陷增强
+                            </button>
+                        </div>
+                        <div class="params-grid">
+                            <div class="form-group"><label class="form-label">模型大小</label><select id="modelSize"
+                                    class="form-control">
+                                    <optgroup label="YOLOv8">
+                                        <option value="v8n">Nano (v8n)</option>
+                                        <option value="v8s" selected>Small (v8s)</option>
+                                        <option value="v8m">Medium (v8m)</option>
+                                        <option value="v8l">Large (v8l)</option>
+                                    </optgroup>
+                                    <optgroup label="YOLO11">
+                                        <option value="v11n">Nano (11n)</option>
+                                        <option value="v11s">Small (11s)</option>
+                                        <option value="v11m">Medium (11m)</option>
+                                    </optgroup>
+                                    <optgroup label="YOLO26">
+                                        <option value="v26n">Nano (v26n)</option>
+                                        <option value="v26s">Small (v26s)</option>
+                                        <option value="v26m">Medium (v26m)</option>
+                                        <option value="v26l">Large (v26l)</option>
+                                        <option value="v26x">X-Large (v26x)</option>
+                                    </optgroup>
+                                </select></div>
+                            <div class="form-group"><label class="form-label">图片尺寸
+                                    (ImgSz)</label><input type="number" id="imgSize" class="form-control" value="640"
+                                    step="32"></div>
+                            <div class="form-group"><label class="form-label">Batch
+                                    Size</label><input type="number" id="batchSize" class="form-control" value="16"
+                                    placeholder="Auto (-1)"></div>
+                            <div class="form-group"><label class="form-label">Epochs</label><input type="number"
+                                    id="epochs" class="form-control" value="300">
+                            </div>
+                            <div class="form-group"><label class="form-label">Patience</label><input type="number"
+                                    id="patience" class="form-control" value="50">
+                            </div>
+                            <div class="form-group"><label class="form-label">Worker
+                                    Threads</label><input type="number" id="workers" class="form-control" value="8">
+                            </div>
+                            <div class="form-group"><label class="form-label">GPU
+                                    Index</label><input type="text" id="gpuIndex" class="form-control" value="0">
+                            </div>
+                        </div>
+                        <div class="params-grid" style="margin-top: 10px;">
+                            <div class="switch-row">
+                                <span>P2 小目标增强</span>
+                                <label class="switch"><input type="checkbox" id="enableP2"><span
+                                        class="slider"></span></label>
+                            </div>
+                            <div class="switch-row">
+                                <span>自动修正图片</span>
+                                <label class="switch"><input type="checkbox" id="autoFixImage" checked><span
+                                        class="slider"></span></label>
+                            </div>
+                        </div>
+
+                        <!-- Model Management Config -->
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                            <div class="params-grid">
+                                <div class="form-group">
+                                    <label class="form-label">自定义模型名称 (ONNX Name) <span
+                                            style="color: var(--text-sub); font-weight: normal; font-size: 12px;">(为空则自动命名)</span></label>
+                                    <input type="text" id="customOnnxName" class="form-control"
+                                        placeholder="例如: MyModel-v1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">模型保存目录 (Storage Path)</label>
+                                    <div class="input-group">
+                                        <input type="text" id="modelStoragePath" class="form-control" readonly
+                                            placeholder="默认: 项目根目录/models">
+                                        <button class="btn btn-secondary"
+                                            onclick="selectFolder('modelStorage')">📁</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px; display: flex; gap: 12px;">
+                            <button id="btnGenerate" class="btn btn-primary" onclick="startGenerate()" style="flex: 1;">✨
+                                生成数据集 (Generate)</button>
+                            <button id="btnExportZip" class="btn btn-secondary" onclick="openExportZipModal()"
+                                style="flex: 1; border-color: #00897B; color: #00897B; background: rgba(0, 137, 123, 0.05);">
+                                导出 ZIP
+                            </button>
+                            <button id="btnKaggleTrain" class="btn btn-secondary" onclick="openKaggleCloudModal()"
+                                style="flex: 1; border-color: #1f6feb; color: #1f6feb; background: rgba(31, 111, 235, 0.05);">
+                                Kaggle 云训练
+                            </button>
+                        </div>
+                        <div id="statusMessage"
+                            style="text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-sub); height: 20px;">
+                        </div>
+                        <!-- Status Grid -->
+
+                    </div>
+                    <div class="card" style="flex: 0;">
+                        <div class="card-header"><span>执行控制</span></div>
+                        <div class="form-group">
+                            <div class="input-group"><input type="text" id="pythonPath" class="form-control"
+                                    value="C:\conda_envs\yolo\python.exe" placeholder="Python Environment Path..."
+                                    onchange="savePythonPath(this.value)"><button class="btn btn-secondary"
+                                    onclick="selectFolder('python')" title="浏览文件夹">📁</button><button
+                                    class="btn btn-secondary" onclick="saveAsDefaultPythonPath()" title="保存为默认地址"
+                                    style="margin-left: 4px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                        style="margin-right: 4px;">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    设为默认
+                                </button></div>
+                        </div>
+                        <div style="display: flex; gap: 16px;">
+                            <button id="btnStartTrain" class="btn btn-primary" onclick="startTraining()"
+                                style="flex: 2;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                开始训练
+                            </button>
+                            <button id="btnStopTrain" class="btn btn-danger" onclick="stopTraining()" disabled
+                                style="flex: 1;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                </svg>
+                                停止
+                            </button>
+                            <button id="btnOpenOutput" class="btn btn-secondary" onclick="openOutputFolder()"
+                                style="display: none;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="margin-right: 6px;">
+                                    <path
+                                        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                    </path>
+                                </svg>
+                                结果
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Layout Optimization: System Status & Mini Log -->
+                    <!-- Flex-grow to fill the remaining vertical space -->
+                    <div class="card" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                        <div class="card-header"><span>系统状态 (System Status)</span><span
+                                style="font-size: 11px; color: var(--text-sub);">Live</span>
+                        </div>
+                        <!-- Status Grid -->
+                        <!-- Status Grid -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                            <div
+                                style="background: rgba(0, 137, 123, 0.04); padding: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(0, 137, 123, 0.1);">
+                                <div
+                                    style="width: 32px; height: 32px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00897B"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M12 19c-4.4 0-8-3.6-8-8 0-4.4 3.6-8 8-8 4.4 0 8 3.6 8 8 0 4.4-3.6 8-8 8z">
+                                        </path>
+                                        <path d="M12 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"></path>
+                                    </svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: var(--text-sub); font-weight: 500;">Python
+                                        Env
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--success);">Detected
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                style="background: rgba(0, 137, 123, 0.04); padding: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid rgba(0, 137, 123, 0.1);">
+                                <div
+                                    style="width: 32px; height: 32px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00897B"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                                    </svg>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 11px; color: var(--text-sub); font-weight: 500;">GPU
+                                        Status
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--success);"
+                                        id="gpuStatus">Ready</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- View: Monitor -->
+        <div id="view-monitor" class="view-container">
+            <div class="monitor-layout">
+                <!-- KPI Cards -->
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
+                            </svg>
+                            Epochs
+                        </div>
+                        <div class="kpi-value" id="kpi-epoch">0/0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d98e84"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            Box Loss
+                        </div>
+                        <div class="kpi-value" id="kpi-loss" style="color: #d98e84;">0.00</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8cb6a8"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                            mAP50
+                        </div>
+                        <div class="kpi-value" id="kpi-map50" style="color: #8cb6a8;">0.00</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e6c587"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon
+                                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                                </polygon>
+                            </svg>
+                            mAP50-95
+                        </div>
+                        <div class="kpi-value" id="kpi-map95" style="color: #e6c587;">0.00</div>
+                        <div style="position: absolute; right: 20px; bottom: 20px; opacity: 0.1;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e6c587"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <!-- Main Chart -->
+                <div class="chart-row"><canvas id="trainingChart"></canvas></div>
+                <!-- Terminal & Progress -->
+                <div class="log-row">
+                    <div class="status-header">
+                        <div style="display:flex; gap:15px;"><span id="progressStatus">Ready</span><span
+                                id="progressETA" style="color: #0be881;"></span></div><span
+                            id="progressPercent">0%</span>
+                    </div>
+                    <div style="height: 4px; background: rgba(255,255,255,0.1);">
+                        <div class="progress-bar" id="progressFill" style="height:100%; width:0%; background:#0be881;">
+                        </div>
+                    </div>
+                    <div class="console-log" id="console">
+                        <div class="log-item"><span class="log-time">[System]</span>Ready to train.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- View: Tools (Data Converter) -->
+        <div id="view-tools" class="view-container">
+            <div class="card">
+                <div class="card-header"><span>LabelMe 转 YOLO (Converter)</span></div>
+                <div class="form-group"><label class="form-label">源文件夹路径 (LabelMe JSONs +
+                        Images)</label>
+                    <div class="input-group"><input type="text" id="toolSourcePath" class="form-control"
+                            placeholder="选择包含 JSON 和图片的文件夹..."><button class="btn btn-secondary"
+                            onclick="selectFolder('toolSource')">📁</button></div>
+                </div>
+                <div class="form-group"><label class="form-label">目标保存路径 (Output Folder)</label>
+                    <div class="input-group"><input type="text" id="toolTargetPath" class="form-control"
+                            placeholder="选择转换结果保存位置..."><button class="btn btn-secondary"
+                            onclick="selectFolder('toolTarget')">📁</button></div>
+                </div>
+                <div style="margin-top: 24px;"><button class="btn btn-primary" onclick="startToolConversion()"
+                        style="width: 100%;">🚀 开始转换 (Start
+                        Conversion) </button></div>
+            </div>
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-header"><span>转换日志 (Log)</span></div>
+                <div class="console-log" id="toolConsole" style="background: #1e272e; border-radius: 12px;">
+                    <div class="log-item"><span class="log-time">[System]</span>Ready for
+                        conversion.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Training History (Simplified) -->
+        <div id="view-models" class="view-container">
+            <div class="card fill-height">
+                <div class="card-header">
+                    <span>训练历史 (Training History)</span>
+                    <button class="btn btn-secondary btn-icon" onclick="loadTrainingHistory()" title="刷新历史">🔄</button>
+                </div>
+
+                <div class="checklist-container">
+                    <table class="training-table">
+                        <thead>
+                            <tr>
+                                <th>项目 (Project)</th>
+                                <th>配置 (Config)</th>
+                                <th>训练指标 (Metrics)</th>
+                                <th style="width: 150px;">时间 (Date)</th>
+                                <th style="width: 60px; text-align: center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trainingHistoryBody">
+                            <!-- Training history entries will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: ONNX Manager -->
+        <div id="view-onnx" class="view-container">
+            <div class="config-layout">
+                <!-- Left Column: Project Selector -->
+                <div class="panel-col" style="width: 320px;">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>ONNX 项目池</span>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-primary btn-icon" onclick="openCreateOnnxProjectModal()" title="新建项目" style="padding:4px; width:28px; height:28px;">+</button>
+                                <button class="btn btn-secondary btn-icon" onclick="loadOnnxProjects()" title="刷新项目" style="padding:4px; width:28px; height:28px;">🔄</button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:20px;">
+                            <label class="form-label">当前项目 (Project)</label>
+                            <select id="onnxProjectSelect" class="form-control" onchange="loadOnnxModels()">
+                                <option value="">正在加载...</option>
+                            </select>
+                        </div>
+                        <div style="margin-top: 24px;">
+                            <button class="btn btn-danger" onclick="deleteOnnxProject()" style="width: 100%;">删除当前项目</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Column: ONNX File List -->
+                <div class="panel-col">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>ONNX 模型列表</span>
+                        </div>
+                        <div class="checklist-container" style="padding: 0; background: #fff;">
+                            <table class="training-table">
+                                <thead>
+                                    <tr>
+                                        <th>模型名称 (File Name)</th>
+                                        <th style="width: 100px;">大小 (Size)</th>
+                                        <th style="width: 150px;">修改时间 (Date)</th>
+                                        <th style="width: 100px; text-align: center;">版本状态</th>
+                                        <th style="width: 60px; text-align: center;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="onnxListBody">
+                                    <tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">请选择项目</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Labeling (SAM2) -->
+        <div id="view-labeling" class="view-container">
+            <div class="labeling-layout">
+                <!-- Sidebar -->
+                <div class="labeling-sidebar">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>图片列表</span>
+                            <button class="btn btn-secondary btn-icon" onclick="openLabelingFolder()" title="打开文件夹"
+                                style="padding:4px; width:28px; height:28px;">📁</button>
+                        </div>
+                        <div class="image-list-container" id="labelingImageList">
+                            <div style="padding: 20px; text-align: center; color: #aaa;">请先打开文件夹</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Area -->
+                <div class="labeling-canvas-area">
+                    <!-- Toolbar -->
+                    <div class="labeling-toolbar">
+                        <button class="toolbar-btn active" id="tool-auto" onclick="setLabelingMode('auto')"
+                            title="智能标注 (SAM)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                            </svg>
+                            自动 <span class="shortcut-hint">(Q)</span>
+                        </button>
+                        <button class="toolbar-btn" id="tool-rect" onclick="setLabelingMode('rect')" title="手动矩形框">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            </svg>
+                            矩形 <span class="shortcut-hint">(R)</span>
+                        </button>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" onclick="labelingAction('undo')" title="撤销上一个点/框 (Ctrl+Z)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v6h6"></path>
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                            </svg>
+                        </button>
+                        <button class="toolbar-btn" onclick="labelingAction('clear')" title="清除当前未完成 (Esc/B)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                            清除 <span class="shortcut-hint">(B)</span>
+                        </button>
+                        <button class="toolbar-btn" onclick="labelingAction('complete')" title="完成当前标注 (Enter/F)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            完成 <span class="shortcut-hint">(F)</span>
+                        </button>
+
+                        <div class="toolbar-info" id="canvasInfo">Loading...</div>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div class="canvas-wrapper" id="canvasWrapper">
+                        <canvas id="labelingCanvas"></canvas>
+                    </div>
+
+                    <!-- Bottom Bar -->
+                    <div
+                        style="height: 48px; background: rgba(255,255,255,0.9); border-top: 1px solid rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; padding: 0 16px;">
+                        <button class="btn btn-secondary" onclick="prevImage()">← (A)</button>
+                        <span style="font-size: 13px; font-weight: 600; color: var(--text-main); font-family: Consolas;"
+                            id="currentImageName">-</span>
+                        <button class="btn btn-secondary" onclick="nextImage()">(D) →</button>
+                    </div>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="labeling-panel">
+                    <!-- Label List -->
+                    <div class="card"
+                        style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 200px;">
+                        <div class="card-header">
+                            <span>分类 (Classes)</span>
+                            <button class="btn btn-secondary btn-icon" onclick="addLabel()"
+                                style="padding: 4px; width: 24px; height: 24px;">+</button>
+                        </div>
+                        <div style="flex: 1; overflow-y: auto; padding-right: 4px;" id="labelListContainer">
+                            <!-- Labels -->
+                        </div>
+                    </div>
+
+                    <!-- Annotations List -->
+                    <div class="card"
+                        style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 200px;">
+                        <div class="card-header"><span>标注 (Objects)</span></div>
+                        <div style="flex: 1; overflow-y: auto;" id="annotationListContainer">
+                            <!-- Current Annotations -->
+                        </div>
+                    </div>
+
+                    <!-- Model Settings -->
+                    <div class="card">
+                        <div class="card-header"><span>模型设置</span></div>
+                        <div class="form-group">
+                            <label class="form-label">模型</label>
+                            <select class="form-control" id="samModelSelect">
+                                <option value="sam2.1_hiera_tiny">SAM2.1 Tiny (推荐)</option>
+                            </select>
+                        </div>
+                        <div class="switch-row" style="padding: 8px 0; border: none; background: transparent;">
+                            <span style="font-size: 13px;">GPU 加速</span>
+                            <label class="switch">
+                                <input type="checkbox" id="samUseGpu" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin-top: 8px;">
+                            <label class="form-label">阈值 (灵敏度) <span id="thresholdValue"
+                                    style="color: var(--primary); font-weight: bold;">0.0</span></label>
+                            <input type="range" id="samThreshold" min="-5" max="5" step="0.5" value="0"
+                                style="width: 100%; cursor: pointer;"
+                                oninput="document.getElementById('thresholdValue').innerText = parseFloat(this.value).toFixed(1)">
+                            <div
+                                style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 2px;">
+                                <span>宽松 (-5)</span>
+                                <span>严格 (+5)</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="btnLoadModel" onclick="loadSAMModel()"
+                            style="width: 100%; margin-top: 8px;">
+                            ⚡ 加载模型
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Project Modal -->
+    <div id="createProjectModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--text-main);">新建项目
+                (Create Project)</h3>
+            <div class="form-group"><label class="form-label">项目名称 (Name)</label><input type="text" id="newProjectName"
+                    class="form-control" placeholder="例如: Screw Detection"></div>
+            <div class="form-group"><label class="form-label">项目根目录 (Root Path)</label>
+                <div class="input-group"><input type="text" id="newProjectRoot" class="form-control" readonly
+                        placeholder="选择空文件夹或现有数据文件夹..."><button class="btn btn-secondary"
+                        onclick="selectFolder('newProjectRoot')">📁</button></div>
+            </div>
+            <div class="form-group"><label class="form-label">包含类别 (Classes)</label><input type="text"
+                    id="newProjectClasses" class="form-control" placeholder="用逗号分隔, 例如: screw, nut, ng">
+                <p style="font-size: 12px; color: #999; margin-top: 4px;">* 对应 YOLO data.yaml 中的 names</p>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;"><button
+                    class="btn btn-secondary" onclick="closeCreateProjectModal()">取消</button><button
+                    class="btn btn-primary" onclick="createProject()">创建</button></div>
+        </div>
+    </div>
+    <!-- Create ONNX Project Modal -->
+    <div id="createOnnxProjectModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--text-main);">新建 ONNX 项目</h3>
+            <div class="form-group">
+                <label class="form-label">项目名称 (Name)</label>
+                <input type="text" id="newOnnxProjectName" class="form-control" placeholder="例如: Screw Models">
+            </div>
+            <div class="form-group">
+                <label class="form-label">模型所在目录 (Root Path)</label>
+                <div class="input-group">
+                    <input type="text" id="newOnnxProjectRoot" class="form-control" readonly placeholder="选择包含 .onnx 的文件夹...">
+                    <button class="btn btn-secondary" onclick="selectFolder('newOnnxProjectRoot')">📁</button>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button class="btn btn-secondary" onclick="closeCreateOnnxProjectModal()">取消</button>
+                <button class="btn btn-primary" onclick="createOnnxProject()">创建</button>
+            </div>
+        </div>
+    </div>
+    <!-- Modals -->
+    <div id="augmentModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 24px; color: var(--primary); text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);">
+                缺陷样本增强
+            </h3>
+            <div class="form-group"><label class="form-label">源路径 (Source)</label>
+                <div class="input-group"><input type="text" id="augmentSourcePath" class="form-control" readonly><button
+                        class="btn btn-secondary" onclick="selectFolder('augmentSource')">📁</button></div>
+            </div>
+            <div class="form-group"><label class="form-label">素材路径 (Defect Assets)</label>
+                <div class="input-group"><input type="text" id="holeAssetsPath" class="form-control" readonly><button
+                        class="btn btn-secondary" onclick="selectFolder('holeAssets')">📁</button>
+                </div>
+            </div>
+            <div class="form-group"><label class="form-label">生成比例: <span id="mutationRateVal">30%</span></label><input
+                    type="range" id="mutationRate" style="width: 100%; accent-color: var(--primary);" min="10" max="80"
+                    value="30" oninput="document.getElementById('mutationRateVal').innerText = this.value + '%'">
+            </div>
+            <div style="background: #f5f5f5; border-radius: 8px; height: 6px; overflow: hidden; margin: 20px 0;">
+                <div id="augmentFill"
+                    style="background: var(--primary); width: 0%; height: 100%; transition: width 0.3s;">
+                </div>
+            </div>
+            <div id="augmentStatus"
+                style="font-size: 12px; color: var(--text-sub); margin-bottom: 20px; text-align: center;">
+                Wait</div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px;"><button class="btn btn-secondary"
+                    onclick="closeAugmentModal()">取消</button><button class="btn btn-primary"
+                    onclick="startAugmentation()">开始生成</button></div>
+        </div>
+    </div>
+    <div id="exportZipModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 20px; color: var(--text-main);">导出 YOLO 数据集 ZIP</h3>
+
+            <div class="form-group">
+                <label class="form-label">数据源文件夹</label>
+                <div id="exportDataSourceList" class="checklist-container">
+                    <div style="padding: 20px; text-align: center; color: #aab8c2;">请先选择项目并加载子文件夹</div>
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">YOLO 版本</label>
+                    <select id="exportYoloVersion" class="form-control">
+                        <option value="yolov8" selected>YOLOv8</option>
+                        <option value="yolo11">YOLO11</option>
+                        <option value="yolo26">YOLO26</option>
+                        <option value="yolov9">YOLOv9</option>
+                        <option value="yolov10">YOLOv10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">模型尺寸</label>
+                    <select id="exportModelSize" class="form-control">
+                        <option value="n">n (Nano)</option>
+                        <option value="s" selected>s (Small)</option>
+                        <option value="m">m (Medium)</option>
+                        <option value="l">l (Large)</option>
+                        <option value="x">x (X-Large)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">训练集比例 (%)</label>
+                    <input type="number" id="exportSplitRatio" class="form-control" min="50" max="95" step="5"
+                        value="80">
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">Epochs</label>
+                    <input type="number" id="exportEpochs" class="form-control" value="300" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Batch Size</label>
+                    <input type="number" id="exportBatchSize" class="form-control" value="16">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ImgSz</label>
+                    <input type="number" id="exportImgSize" class="form-control" value="640" step="32">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Patience</label>
+                    <input type="number" id="exportPatience" class="form-control" value="50" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Workers</label>
+                    <input type="number" id="exportWorkers" class="form-control" value="8" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">GPU Index</label>
+                    <input type="text" id="exportGpuIndex" class="form-control" value="0">
+                </div>
+            </div>
+
+            <p style="font-size: 12px; color: #7f8c8d; margin-top: 8px;">
+                导出内容包含 images/train、images/val、labels/train、labels/val、data.yaml、training_config.json、YOLO_train.ipynb
+            </p>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeExportZipModal()">取消</button>
+                <button class="btn btn-primary" onclick="startExportZip()">开始导出</button>
+            </div>
+        </div>
+    </div>
+    <div id="kaggleCloudModal" class="modal">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 20px; color: var(--text-main);">Kaggle 云端训练</h3>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">Kaggle 用户名</label>
+                    <input type="text" id="kaggleUsername" class="form-control" placeholder="例如: herverjun">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dataset Slug</label>
+                    <input type="text" id="kaggleDatasetSlug" class="form-control" placeholder="project-yolo-dataset">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notebook Slug</label>
+                    <input type="text" id="kaggleKernelSlug" class="form-control" placeholder="project-yolo-train">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">数据源文件夹</label>
+                <div id="kaggleDataSourceList" class="checklist-container">
+                    <div style="padding: 20px; text-align: center; color: #aab8c2;">请先选择项目并加载子文件夹</div>
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">YOLO 版本</label>
+                    <select id="kaggleYoloVersion" class="form-control">
+                        <option value="yolov8" selected>YOLOv8</option>
+                        <option value="yolo11">YOLO11</option>
+                        <option value="yolo26">YOLO26</option>
+                        <option value="yolov9">YOLOv9</option>
+                        <option value="yolov10">YOLOv10</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">模型尺寸</label>
+                    <select id="kaggleModelSize" class="form-control">
+                        <option value="n">n (Nano)</option>
+                        <option value="s" selected>s (Small)</option>
+                        <option value="m">m (Medium)</option>
+                        <option value="l">l (Large)</option>
+                        <option value="x">x (X-Large)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">训练集比例 (%)</label>
+                    <input type="number" id="kaggleSplitRatio" class="form-control" min="50" max="95" step="5"
+                        value="80">
+                </div>
+            </div>
+
+            <div class="params-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label class="form-label">Epochs</label>
+                    <input type="number" id="kaggleEpochs" class="form-control" value="300" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Batch Size</label>
+                    <input type="number" id="kaggleBatchSize" class="form-control" value="16">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ImgSz</label>
+                    <input type="number" id="kaggleImgSize" class="form-control" value="640" step="32">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Patience</label>
+                    <input type="number" id="kagglePatience" class="form-control" value="50" min="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Workers</label>
+                    <input type="number" id="kaggleWorkers" class="form-control" value="8" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">GPU Index</label>
+                    <input type="text" id="kaggleGpuIndex" class="form-control" value="0">
+                </div>
+            </div>
+
+            <p style="font-size: 12px; color: #7f8c8d; margin-top: 8px;">
+                需要本机已安装 Kaggle CLI，并已配置 %USERPROFILE%\.kaggle\kaggle.json。提交后可在 Kaggle Code 页面查看运行状态。
+            </p>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="downloadKaggleOutput()">下载输出</button>
+                <button class="btn btn-secondary" onclick="closeKaggleCloudModal()">取消</button>
+                <button class="btn btn-primary" onclick="startKaggleCloudTraining()">提交训练</button>
+            </div>
+        </div>
+    </div>
+    <!-- Success Notification Toast -->
+    <div id="successToastOverlay" class="success-toast-overlay"></div>
+    <div id="successToast" class="success-toast">
+        <div class="success-toast-icon">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+        <div class="success-toast-title" id="successToastTitle">操作完成！</div>
+        <div class="success-toast-message" id="successToastMessage">数据集生成已成功完成</div>
+        <button class="success-toast-close" onclick="hideSuccessToast()">确定</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script> // ========== Tabs Management ==========
+
+        // Global Error Handler
+        window.addEventListener('error', function (event) {
+            console.error("Global Script Error:", event.error);
+            // Try to notify user if showMiniToast is available
+            if (typeof showMiniToast === 'function') {
+                showMiniToast('error', 'Script Error', event.message || 'Unknown error');
+            }
+        });
+
+        function switchTab(viewId) {
+            try {
+                // Update Nav
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                const nav = document.getElementById('nav-' + viewId);
+                if (nav) nav.classList.add('active');
+
+                // Update View
+                document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+                const view = document.getElementById('view-' + viewId);
+                if (view) view.classList.add('active');
+
+                if (viewId === 'monitor' && typeof chartInstance !== 'undefined' && chartInstance) {
+                    setTimeout(() => chartInstance.resize(), 100);
+                }
+
+                if (viewId === 'models') {
+                    if (typeof loadTrainingHistory === 'function') loadTrainingHistory();
+                }
+
+                if (viewId === 'onnx') {
+                    const selectOnnx = document.getElementById('onnxProjectSelect');
+                    if(selectOnnx && selectOnnx.options.length === 0) {
+                        loadOnnxProjects();
+                    } else {
+                        loadOnnxModels();
+                    }
+                }
+
+                if (viewId === 'labeling') {
+                    // 请求可用模型列表
+                    window.chrome.webview.postMessage(JSON.stringify({ action: 'get_sam_models' }));
+
+                    // 标记需要自动加载，等模型列表返回后再执行
+                    if (typeof lblState !== 'undefined' && !lblState.samLoaded) {
+                        lblState.pendingAutoLoad = true;
+                    }
+                }
+            } catch (err) {
+                console.error("switchTab error:", err);
+            }
+        }
+
+        // ========== Project Management ==========
+        let currentProjects = [];
+        let currentProjectConfig = null;
+
+        function loadProjects() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_projects'
+            }));
+        }
+
+        function onProjectChanged() {
+            const select = document.getElementById('projectSelect');
+            const idx = select.selectedIndex;
+
+            if (idx >= 0 && currentProjects[idx]) {
+                currentProjectConfig = currentProjects[idx];
+
+                // Update Target Path (Constructed)
+                const workspace = currentProjectConfig.RootPath + "\\dataset";
+                document.getElementById('targetPath').value = workspace;
+
+                // Request Subfolders
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'get_subfolders',
+                    path: currentProjectConfig.RootPath
+                }));
+            }
+        }
+
+        let currentOnnxProjects = [];
+
+        function loadOnnxProjects() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_onnx_projects'
+            }));
+        }
+
+        function updateOnnxProjectList(projects) {
+            currentOnnxProjects = projects;
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select) return;
+            select.innerHTML = '';
+
+            projects.forEach((p, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = p.Name;
+                select.appendChild(opt);
+            });
+
+            if (projects.length > 0) {
+                loadOnnxModels();
+            } else {
+                document.getElementById('onnxListBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">尚未创建或发现可用的 ONNX 项目</td></tr>';
+            }
+        }
+
+        function loadOnnxModels() {
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select || select.selectedIndex < 0) return;
+            const project = currentOnnxProjects[select.selectedIndex];
+            if(!project) return;
+            
+            document.getElementById('onnxListBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">加载中...</td></tr>';
+            
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_onnx_models',
+                projectName: project.Name
+            }));
+        }
+
+        function renderOnnxModels(models) {
+            const tbody = document.getElementById('onnxListBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            if(!models || models.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">该目录下暂无 ONNX 模型数据</td></tr>';
+                return;
+            }
+            models.forEach((model, index) => {
+                const tr = document.createElement('tr');
+                const isLatest = index === 0;
+
+                const nameCell = document.createElement('td');
+                nameCell.textContent = model.Name || '';
+                nameCell.style.fontWeight = isLatest ? '600' : 'normal';
+                nameCell.style.color = isLatest ? 'var(--primary-dark)' : 'var(--text-main)';
+                nameCell.style.fontSize = '14px';
+
+                const sizeCell = document.createElement('td');
+                const sizeBytes = Number(model.SizeBytes) || 0;
+                sizeCell.textContent = `${(sizeBytes / 1024 / 1024).toFixed(2)} MB`;
+                sizeCell.style.color = 'var(--text-sub)';
+                sizeCell.style.fontSize = '13px';
+
+                const dateCell = document.createElement('td');
+                dateCell.textContent = model.LastWriteTime || '';
+                dateCell.style.color = 'var(--text-sub)';
+                dateCell.style.fontFamily = 'Consolas, monospace';
+                dateCell.style.fontSize = '13px';
+
+                const statusCell = document.createElement('td');
+                statusCell.style.textAlign = 'center';
+                const statusBadge = document.createElement('span');
+                statusBadge.textContent = isLatest ? 'Latest' : 'Archived';
+                statusBadge.style.fontSize = '12px';
+                if (isLatest) {
+                    statusBadge.style.background = 'var(--success)';
+                    statusBadge.style.color = 'white';
+                    statusBadge.style.padding = '4px 10px';
+                    statusBadge.style.borderRadius = '12px';
+                    statusBadge.style.fontWeight = '700';
+                    statusBadge.style.display = 'inline-block';
+                    statusBadge.style.boxShadow = '0 2px 4px rgba(16,185,129,0.3)';
+                } else {
+                    statusBadge.style.color = 'var(--text-sub)';
+                }
+                statusCell.appendChild(statusBadge);
+
+                const actionCell = document.createElement('td');
+                actionCell.style.textAlign = 'center';
+                const openBtn = document.createElement('button');
+                openBtn.className = 'btn btn-secondary btn-icon';
+                openBtn.title = '打开所在位置';
+                openBtn.textContent = '📁';
+                openBtn.style.padding = '4px';
+                openBtn.style.width = '28px';
+                openBtn.style.height = '28px';
+                openBtn.addEventListener('click', () => {
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'open_model_folder',
+                        path: model.FullPath || ''
+                    }));
+                });
+                actionCell.appendChild(openBtn);
+
+                tr.appendChild(nameCell);
+                tr.appendChild(sizeCell);
+                tr.appendChild(dateCell);
+                tr.appendChild(statusCell);
+                tr.appendChild(actionCell);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openCreateOnnxProjectModal() {
+            document.getElementById('createOnnxProjectModal').style.display = 'flex';
+        }
+
+        function closeCreateOnnxProjectModal() {
+            document.getElementById('createOnnxProjectModal').style.display = 'none';
+        }
+
+        function createOnnxProject() {
+            const name = document.getElementById('newOnnxProjectName').value;
+            const root = document.getElementById('newOnnxProjectRoot').value;
+
+            if (!name || !root) {
+                showMiniToast('warning', '提示', '项目名称和根目录不能为空');
+                return;
+            }
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'create_onnx_project',
+                name: name,
+                rootPath: root
+            }));
+
+            closeCreateOnnxProjectModal();
+        }
+
+        function deleteOnnxProject() {
+            const select = document.getElementById('onnxProjectSelect');
+            if(!select || select.selectedIndex < 0) return;
+
+            if (confirm('确定要从列表移除当前 ONNX 项目吗？此操作不会删除硬盘文件。')) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_onnx_project',
+                    index: select.selectedIndex
+                }));
+            }
+        }
+
+        function updateProjectList(projects) {
+            currentProjects = projects;
+            const select = document.getElementById('projectSelect');
+            select.innerHTML = '';
+
+            projects.forEach((p, index) => {
+                const opt = document.createElement('option');
+                opt.value = index;
+                opt.text = p.Name;
+                select.appendChild(opt);
+            });
+
+            if (projects.length > 0) {
+                onProjectChanged();
+            }
+
+            else {
+                document.getElementById('dataSourceList').innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">请先创建项目 (projects.json)</div>';
+            }
+        }
+
+        function updateSubFolders(folders) {
+            const list = document.getElementById('dataSourceList');
+            list.innerHTML = '';
+
+            if (!folders || folders.length === 0) {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">未找到子文件夹</div>';
+                return;
+            }
+
+            folders.forEach((folder, index) => {
+                const item = document.createElement('div');
+                item.className = 'checklist-item stagger-item';
+                item.style.animationDelay = (index * 0.05) + 's';
+
+                item.onclick = function (e) {
+                    if (e.target.type !== 'checkbox') {
+                        const cb = item.querySelector('input');
+                        cb.checked = !cb.checked;
+                    }
+                };
+
+                const inp = document.createElement('input');
+                inp.type = 'checkbox';
+                inp.value = folder;
+
+                const lbl = document.createElement('label');
+                lbl.innerText = folder;
+
+                item.appendChild(inp);
+                item.appendChild(lbl);
+                list.appendChild(item);
+            });
+        }
+
+        // ========== WebView2 Bridge ==========
+        window.chrome.webview.addEventListener('message', event => {
+            const data = JSON.parse(event.data); // Make sure backend sends stringified JSON or object
+
+            if (data.action === 'projects_loaded') {
+                updateProjectList(data.projects);
+            }
+
+            else if (data.action === 'subfolders_loaded') {
+                updateSubFolders(data.folders);
+            }
+
+            else if (data.action === 'onnx_projects_loaded') {
+                updateOnnxProjectList(data.projects);
+            }
+
+            else if (data.action === 'onnx_models_loaded') {
+                renderOnnxModels(data.models);
+            }
+
+            else if (data.action === 'log') {
+                addLog(data.message, data.type);
+            }
+
+            else if (data.action === 'export_zip_progress') {
+                updateProgress(data.progress, 'ZIP 导出中...');
+            }
+
+            else if (data.action === 'export_zip_complete') {
+                updateProgress(100, 'ZIP 导出完成');
+                showSuccessToast(data.path, 'ZIP 导出成功');
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
+                addLog(`ZIP 导出完成: ${data.path}`, 'success');
+                setTimeout(() => { updateProgress(0, 'Ready'); }, 5000);
+            }
+
+            else if (data.action === 'export_zip_cancelled') {
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
+                updateProgress(0, '已取消导出');
+                addLog('用户已取消 ZIP 导出', 'warning');
+            }
+
+            else if (data.action === 'kaggle_progress') {
+                updateProgress(data.progress || 0, data.status || 'Kaggle 云训练提交中...');
+            }
+
+            else if (data.action === 'kaggle_training_started') {
+                localStorage.setItem('insight_kaggle_kernel_id', data.kernelId || '');
+                updateProgress(100, 'Kaggle Notebook 已提交');
+                showMiniToast('success', '已提交 Kaggle', data.kernelId || 'Notebook 已启动', 'success');
+                addLog(`Kaggle Dataset: ${data.datasetId}`, 'success');
+                addLog(`Kaggle Notebook: https://www.kaggle.com/code/${data.kernelId}`, 'success');
+                const kaggleBtn = document.getElementById('btnKaggleTrain');
+                if (kaggleBtn) kaggleBtn.disabled = false;
+            }
+
+            else if (data.action === 'kaggle_training_failed') {
+                const kaggleBtn = document.getElementById('btnKaggleTrain');
+                if (kaggleBtn) kaggleBtn.disabled = false;
+                updateProgress(0, 'Kaggle 提交失败');
+            }
+
+            else if (data.action === 'kaggle_output_downloaded') {
+                showMiniToast('success', '下载完成', data.outputDir || 'Kaggle 输出已下载', 'success');
+                addLog(`Kaggle 输出下载完成: ${data.outputDir}`, 'success');
+            }
+
+            else if (data.action === 'training_data') {
+                // data: { epoch, box_loss, map50, map5095, progress }
+                updateChart(data.epoch, data.box_loss, data.map50, data.map5095);
+
+                // Update Progress
+                if (data.progress !== undefined) {
+                    const pct = Math.round(data.progress) + '%';
+                    document.getElementById('progressFill').style.width = pct;
+                    document.getElementById('progressPercent').innerText = pct;
+                    document.getElementById('progressStatus').innerText = 'Epoch: ' + data.epoch;
+
+                    // ETA Logic
+                    updateETA(data.epoch);
+                }
+            }
+
+            else if (data.action === 'folder_selected') {
+                if (data.type === 'python') {
+                    document.getElementById('pythonPath').value = data.path;
+                    savePythonPath(data.path);
+                }
+                else if (data.type === 'augmentSource') document.getElementById('augmentSourcePath').value = data.path;
+                else if (data.type === 'holeAssets') document.getElementById('holeAssetsPath').value = data.path;
+                else if (data.type === 'newProjectRoot') document.getElementById('newProjectRoot').value = data.path;
+                else if (data.type === 'newOnnxProjectRoot') document.getElementById('newOnnxProjectRoot').value = data.path;
+                else if (data.type === 'toolSource') document.getElementById('toolSourcePath').value = data.path;
+                else if (data.type === 'toolTarget') document.getElementById('toolTargetPath').value = data.path;
+                else if (data.type === 'modelStorage') {
+                    document.getElementById('modelStoragePath').value = data.path;
+                    localStorage.setItem('insight_model_storage_path', data.path);
+                    // If we are in model tab, refresh
+                    if (document.getElementById('view-models').classList.contains('active')) {
+                        refreshModels();
+                    }
+                }
+                else if (data.type === 'labeling') {
+                    // Send request to load images
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'get_images_in_folder',
+                        path: data.path
+                    }));
+                }
+            }
+
+            else if (data.action === 'augment_progress') {
+                document.getElementById('augmentFill').style.width = data.progress + '%';
+                document.getElementById('augmentStatus').innerText = '处理中 ' + data.progress + '%';
+            }
+
+            else if (data.action === 'augment_complete') {
+                document.getElementById('augmentFill').style.width = '100%';
+                document.getElementById('augmentStatus').innerText = '完成 100%';
+
+                setTimeout(() => {
+                    closeAugmentModal(); addLog('Augmentation Complete', 'success');
+                }
+
+                    , 1000);
+            }
+
+            else if (data.action === 'training_finished') {
+                const ok = data.success !== false;
+                showMiniToast(ok ? 'success' : 'error', ok ? '训练完成' : '训练失败', ok ? '模型训练与导出已完成！' : '训练未成功完成或导出失败，请查看日志。', ok ? 'success' : 'error');
+                addLog(ok ? 'Training Finished!' : 'Training Failed or Export Failed', ok ? 'success' : 'error');
+                document.getElementById('btnStartTrain').disabled = false;
+                document.getElementById('btnStopTrain').disabled = true;
+                if (ok) document.getElementById('btnOpenOutput').style.display = 'inline-flex';
+                document.getElementById('progressStatus').innerText = ok ? 'Done' : 'Failed';
+            }
+
+            else if (data.action === 'training_stopped') {
+                showMiniToast('warning', '训练已停止', '用户手动停止了训练进程', 'warning');
+                addLog('Training Stopped', 'warning');
+                document.getElementById('btnStartTrain').disabled = false;
+                document.getElementById('btnStopTrain').disabled = true;
+                document.getElementById('progressStatus').innerText = 'Stopped';
+            }
+
+            else if (data.action === 'complete') {
+                // 显示右上角通知
+                showMiniToast('success', '操作完成', data.message, 'success');
+                addLog(data.message, 'success');
+            }
+
+            else if (data.action === 'error') {
+                showMiniToast('error', '出错了', data.message, 'error');
+                addLog(data.message, 'error');
+                const exportBtn = document.getElementById('btnExportZip');
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                }
+            }
+
+            else if (data.action === 'training_history_loaded') {
+                renderTrainingHistory(data.history || []);
+            }
+
+            else if (data.action === 'python_path_saved') {
+                if (data.success) {
+                    showMiniToast('success', '设置成功', '已保存为默认地址，重启后自动生效', 'success');
+                } else {
+                    showMiniToast('error', '保存失败', data.error || '未知错误', 'error');
+                }
+            }
+
+            else if (data.action === 'default_python_path_loaded') {
+                if (data.path) {
+                    document.getElementById('pythonPath').value = data.path;
+                }
+            }
+        });
+
+        // ========== Chart Logic ==========
+        const CHART_MAX_POINTS = 100; // 环形缓冲区容量：只显示最近 100 个数据点
+        var chartInstance = null;
+        var trainStartTime = 0;
+
+        function initChart() {
+            var ctx = document.getElementById('trainingChart').getContext('2d');
+            Chart.defaults.color = '#aab8c2';
+            Chart.defaults.borderColor = 'rgba(0,0,0,0.05)';
+
+            chartInstance = new Chart(ctx, {
+
+                type: 'line',
+                data: {
+
+                    labels: [],
+                    datasets: [{
+                        label: 'Box Loss', data: [], borderColor: '#d98e84', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y'
+                    }
+
+                        ,
+                    {
+                        label: 'mAP50', data: [], borderColor: '#8cb6a8', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1'
+                    }
+
+                        ,
+                    {
+                        label: 'mAP50-95', data: [], borderColor: '#e6c587', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: 'y1'
+                    }
+
+                    ]
+                }
+
+                ,
+                options: {
+
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: {
+                        mode: 'index', intersect: false
+                    }
+
+                    ,
+                    plugins: {
+                        legend: {
+                            labels: {
+
+                                color: '#636e72',
+                                font: {
+                                    family: "'Microsoft YaHei UI', 'Segoe UI', sans-serif", size: 12, weight: '500'
+                                }
+
+                                ,
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                padding: 20
+                            }
+                        }
+
+                        ,
+                        tooltip: {
+
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#2d3436',
+                            bodyColor: '#636e72',
+                            borderColor: '#e6e8e9',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            bodyFont: {
+                                family: "'Microsoft YaHei UI', sans-serif"
+                            }
+                        }
+                    }
+
+                    ,
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#b2bec3', maxTicksLimit: 10
+                            }
+
+                            , grid: {
+                                display: false
+                            }
+                        }
+
+                        ,
+                        y: {
+
+                            type: 'linear', display: true, position: 'left',
+                            title: {
+                                display: true, text: 'Loss', color: '#d98e84', font: {
+                                    size: 11, weight: 'bold'
+                                }
+                            }
+
+                            ,
+                            ticks: {
+                                color: '#d98e84'
+                            }
+
+                            ,
+                            grid: {
+                                borderDash: [4, 4], color: 'rgba(0,0,0,0.05)'
+                            }
+                        }
+
+                        ,
+                        y1: {
+
+                            type: 'linear', display: true, position: 'right',
+                            title: {
+                                display: true, text: 'mAP', color: '#8cb6a8', font: {
+                                    size: 11, weight: 'bold'
+                                }
+                            }
+
+                            ,
+                            ticks: {
+                                color: '#8cb6a8',
+                                callback: function (value) {
+                                    // 只显示特定刻度值
+                                    const showTicks = [0, 0.3, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1];
+                                    if (showTicks.includes(value)) {
+                                        return value.toFixed(2);
+                                    }
+                                    return '';
+                                }
+                            }
+
+                            ,
+                            grid: {
+                                display: true,
+                                color: 'rgba(140, 182, 168, 0.1)'
+                            }
+
+                            ,
+                            min: 0, max: 1,
+                            afterBuildTicks: function (axis) {
+                                // 强制使用自定义非线性刻度
+                                axis.ticks = [0, 0.3, 0.5, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
+                                    .map(v => ({ value: v }));
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        setTimeout(initChart, 200);
+
+        function updateChart(epoch, boxLoss, map50, map5095) {
+            if (!chartInstance) return;
+
+            // 重置图表（新训练开始时）
+            if (epoch === '1/...' || (typeof epoch === 'string' && epoch.startsWith('1/'))) {
+                // 新训练开始，清空所有数据
+                chartInstance.data.labels = [];
+                chartInstance.data.datasets.forEach(d => d.data = []);
+            }
+
+            // 处理验证结果 (mAP 数据)
+            if (epoch === 'val') {
+                // mAP 数据更新最后一个数据点的对应值，或者追加到最新位置
+                var len = chartInstance.data.datasets[1].data.length;
+                var labelLen = chartInstance.data.labels.length;
+
+                if (map50 !== undefined) {
+                    // 更新或填充 mAP50 数据到当前位置
+                    while (chartInstance.data.datasets[1].data.length < labelLen) {
+                        // 用前一个值填充，避免曲线断裂
+                        var prevVal = chartInstance.data.datasets[1].data.length > 0
+                            ? chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1]
+                            : null;
+                        chartInstance.data.datasets[1].data.push(prevVal);
+                    }
+                    // 更新最后一个值
+                    if (chartInstance.data.datasets[1].data.length > 0) {
+                        chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1] = map50;
+                    } else {
+                        chartInstance.data.datasets[1].data.push(map50);
+                    }
+                    document.getElementById('kpi-map50').innerText = map50.toFixed(3);
+                }
+
+                if (map5095 !== undefined) {
+                    // 更新或填充 mAP50-95 数据到当前位置
+                    while (chartInstance.data.datasets[2].data.length < labelLen) {
+                        var prevVal = chartInstance.data.datasets[2].data.length > 0
+                            ? chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1]
+                            : null;
+                        chartInstance.data.datasets[2].data.push(prevVal);
+                    }
+                    if (chartInstance.data.datasets[2].data.length > 0) {
+                        chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1] = map5095;
+                    } else {
+                        chartInstance.data.datasets[2].data.push(map5095);
+                    }
+                    document.getElementById('kpi-map95').innerText = map5095.toFixed(3);
+                }
+            } else {
+                // 处理训练数据 (Box Loss)
+                chartInstance.data.labels.push(epoch);
+                chartInstance.data.datasets[0].data.push(boxLoss);
+
+                // 为 mAP 曲线填充 null 占位（等待验证数据）
+                // 使用前一个值来保持曲线连续
+                var prevMap50 = chartInstance.data.datasets[1].data.length > 0
+                    ? chartInstance.data.datasets[1].data[chartInstance.data.datasets[1].data.length - 1]
+                    : null;
+                var prevMap5095 = chartInstance.data.datasets[2].data.length > 0
+                    ? chartInstance.data.datasets[2].data[chartInstance.data.datasets[2].data.length - 1]
+                    : null;
+                chartInstance.data.datasets[1].data.push(prevMap50);
+                chartInstance.data.datasets[2].data.push(prevMap5095);
+
+                // KPI Updates
+                document.getElementById('kpi-epoch').innerText = epoch;
+                if (boxLoss) document.getElementById('kpi-loss').innerText = boxLoss.toFixed(4);
+            }
+
+            // 环形缓冲区：超过 CHART_MAX_POINTS 时，删除最老的点
+            while (chartInstance.data.labels.length > CHART_MAX_POINTS) {
+                chartInstance.data.labels.shift();
+                chartInstance.data.datasets.forEach(d => d.data.shift());
+            }
+
+            // 节流更新：每 10 次调用更新一次图表，减少性能开销
+            if (!window._chartUpdateCounter) window._chartUpdateCounter = 0;
+            window._chartUpdateCounter++;
+            if (window._chartUpdateCounter % 10 === 0 || epoch === 'val') {
+                chartInstance.update('none'); // 'none' 模式禁用动画
+            }
+        }
+
+        function updateETA(epochStr) {
+            if (trainStartTime === 0) trainStartTime = Date.now();
+
+            if (typeof epochStr === 'string' && epochStr.includes('/')) {
+                const parts = epochStr.split('/');
+                const current = parseInt(parts[0]);
+                const total = parseInt(parts[1]);
+
+                if (current > 0 && total > 0) {
+                    const elapsed = (Date.now() - trainStartTime) / 1000;
+                    const avg = elapsed / current;
+                    const remaining = (total - current) * avg;
+
+                    const m = Math.floor(remaining / 60);
+                    const s = Math.floor(remaining % 60);
+
+                    document.getElementById('progressETA').innerText = `ETA: ${m}m ${s}s`;
+                }
+            }
+        }
+
+        function updateProgress(progress, statusText = '') {
+            const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+            const pct = Math.round(safeProgress) + '%';
+
+            const fill = document.getElementById('progressFill');
+            if (fill) {
+                fill.style.width = pct;
+            }
+
+            const percent = document.getElementById('progressPercent');
+            if (percent) {
+                percent.innerText = pct;
+            }
+
+            if (statusText) {
+                const status = document.getElementById('progressStatus');
+                if (status) {
+                    status.innerText = statusText;
+                }
+            }
+        }
+
+        function addLog(msg, type = 'info') {
+
+            // Update Status Message on Config Tab
+            if (msg.includes('生成数据集') || msg.includes('Processing')) {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#7f8fa4';
+            }
+
+            if (msg.includes('完成') || msg.includes('Success')) {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#00b894';
+            }
+
+            if (type === 'error') {
+                document.getElementById('statusMessage').innerText = msg;
+                document.getElementById('statusMessage').style.color = '#d63031';
+            }
+
+            // Sync to Main Console
+            const consoleDiv = document.getElementById('console');
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            const time = new Date().toLocaleTimeString();
+            let colorClass = 'log-info';
+            if (type === 'error') colorClass = 'log-error';
+            if (type === 'success') colorClass = 'log-success';
+            if (type === 'warning') colorClass = 'log-warning';
+
+            item.innerHTML = `<span class="log-time">[${time}]</span><span class="${colorClass}">${msg}</span>`;
+            consoleDiv.appendChild(item);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+
+            // Sync to Mini Console (Config Tab)
+            const miniConsole = document.getElementById('configConsole');
+            if (miniConsole) {
+                const miniItem = document.createElement('div');
+                miniItem.style.marginBottom = '2px';
+                miniItem.style.color = (type === 'error') ? '#ff5252' : ((type === 'success') ? '#0be881' : '#dcdde1');
+                miniItem.innerText = `>${msg}`;
+                miniConsole.appendChild(miniItem);
+                miniConsole.scrollTop = miniConsole.scrollHeight;
+            }
+
+            // Sync to Tool Console
+            const toolConsole = document.getElementById('toolConsole');
+            if (toolConsole) {
+                const item = document.createElement('div');
+                item.className = 'log-item';
+                const time = new Date().toLocaleTimeString();
+
+                let colorClass = 'log-info';
+                if (type === 'error') colorClass = 'log-error';
+                if (type === 'success') colorClass = 'log-success';
+
+                item.innerHTML = `<span class="log-time">[${time}]</span><span class="${colorClass}">${msg}</span>`;
+                toolConsole.appendChild(item);
+                toolConsole.scrollTop = toolConsole.scrollHeight;
+            }
+        }
+
+        // ========== Success Toast Notification ==========
+        function showSuccessToast(message, title = '操作完成！') {
+            document.getElementById('successToastTitle').innerText = title;
+            document.getElementById('successToastMessage').innerText = message;
+            document.getElementById('successToastOverlay').classList.add('show');
+            document.getElementById('successToast').classList.add('show');
+
+            // 播放提示音 (可选)
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAB/f39/');
+                audio.volume = 0.3;
+                audio.play().catch(() => { });
+            } catch (e) { }
+        }
+
+        function hideSuccessToast() {
+            document.getElementById('successToastOverlay').classList.remove('show');
+            document.getElementById('successToast').classList.remove('show');
+        }
+
+        // ========== Actions ==========
+        function selectFile(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_file', type: type
+            }));
+        }
+
+        function selectFolder(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder', type: type
+            }));
+        }
+
+        function startGenerate() {
+            if (!currentProjectConfig) {
+                showMiniToast('warning', '提示', '请先选择项目', 'warning');
+                return;
+            }
+
+            // Collect checked folders
+            const checkboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]:checked');
+
+            if (checkboxes.length === 0) {
+                showMiniToast('warning', '提示', '请至少勾选一个数据源文件夹', 'warning');
+                return;
+            }
+
+            const sourcePaths = Array.from(checkboxes).map(cb => {
+                return currentProjectConfig.RootPath + "\\" + cb.value;
+            });
+
+            const conf = {
+                action: 'generate',
+                sourcePaths: sourcePaths,
+                targetPath: document.getElementById('targetPath').value,
+                classes: currentProjectConfig.Classes,
+
+                modelSize: document.getElementById('modelSize').value,
+                imgSize: parseInt(document.getElementById('imgSize').value),
+                epochs: parseInt(document.getElementById('epochs').value),
+                batchSize: parseInt(document.getElementById('batchSize').value),
+                patience: parseInt(document.getElementById('patience').value),
+                workers: parseInt(document.getElementById('workers').value),
+                gpuIndex: document.getElementById('gpuIndex').value,
+                enableP2: document.getElementById('enableP2').checked,
+                autoFixImage: document.getElementById('autoFixImage').checked
+            };
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function startTraining() {
+            switchTab('monitor');
+            addLog("正在发送训练请求...", "info");
+            trainStartTime = 0;
+            document.getElementById('progressETA').innerText = '';
+
+            const workDir = document.getElementById('targetPath').value;
+
+            document.getElementById('btnStartTrain').disabled = true;
+            document.getElementById('btnStopTrain').disabled = false;
+
+            // New Params
+            const customOnnxName = document.getElementById('customOnnxName').value;
+            const modelStoragePath = document.getElementById('modelStoragePath').value || "";
+
+            // Save storage path if set
+            if (modelStoragePath) {
+                localStorage.setItem('insight_model_storage_path', modelStoragePath);
+            }
+
+            const conf = {
+                action: 'start_training',
+                pythonPath: document.getElementById('pythonPath').value,
+                workDir: workDir,
+                // Add missing params from UI that were not in original startTraining but might be needed
+                // actually original startTraining only sent pythonPath and workDir, 
+                // but HandleStartTraining in backend reads everything from 'data'.
+                // The previous HandleGenerate used a different set. 
+                // Let's ensure startTraining sends ALL params needed by backend HandleStartTraining.
+                // Re-reading HandleStartTraining in Insight.cs (lines 895+) would show what it needs.
+                // Assuming backend reads from the same 'data' object.
+
+                // Oops, looking at Insight.cs HandleStartTraining (viewed previously), it seemingly re-reads params?
+                // No, HandleStartTraining (step 292 view) wasn't fully shown. 
+                // But HandleGenerate (lines 392) reads params.
+                // Let's assume HandleStartTraining in backend reads these too.
+                // The user's original startTraining (line 1665) ONLY sent pythonPath and workDir.
+                // This implies HandleStartTraining might have been reading from a 'config' or maybe the user ISN'T sending params?
+                // Wait, if I scroll up to 1665 in existing file, it only sends pythonPath and workDir.
+                // This is weird. Let me assume I need to send everything.
+                modelSize: document.getElementById('modelSize').value,
+                imgSize: parseInt(document.getElementById('imgSize').value) || 640,
+                epochs: parseInt(document.getElementById('epochs').value) || 300,
+                batchSize: parseInt(document.getElementById('batchSize').value) || 16,
+                patience: parseInt(document.getElementById('patience').value) || 50,
+                workers: parseInt(document.getElementById('workers').value) || 8,
+                gpuIndex: document.getElementById('gpuIndex').value || "0",
+                enableP2: document.getElementById('enableP2').checked,
+                autoFixImage: document.getElementById('autoFixImage').checked,
+                onnxName: customOnnxName,
+                modelStoragePath: modelStoragePath,
+                classes: (currentProjectConfig && currentProjectConfig.Classes) ? currentProjectConfig.Classes : []
+            };
+
+            console.log("Sending training config:", conf);
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function stopTraining() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'stop_training'
+            }));
+        }
+
+        // --- Model Management Logic ---
+
+        function getModelStoragePath() {
+            // Priority 1: User-specified custom path
+            let path = document.getElementById('modelStoragePath').value;
+
+            // Priority 2: Saved in localStorage
+            if (!path) {
+                path = localStorage.getItem('insight_model_storage_path');
+            }
+
+            // Priority 3: Current project's dataset folder (where training outputs go)
+            if (!path && currentProjectConfig && currentProjectConfig.RootPath) {
+                path = currentProjectConfig.RootPath + "\\dataset";
+            }
+
+            // Priority 4: targetPath input (only works when on Config tab)
+            if (!path) {
+                path = document.getElementById('targetPath').value;
+            }
+
+            console.log("[getModelStoragePath] Resolved path:", path);
+            return path;
+        }
+
+        // === Simplified Training History ===
+
+        function loadTrainingHistory() {
+            console.log("[loadTrainingHistory] Requesting training history...");
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_training_history'
+            }));
+        }
+
+        function renderTrainingHistory(entries) {
+            const tbody = document.getElementById('trainingHistoryBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (!entries || entries.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #aaa; padding: 30px;">暂无训练记录。完成一次训练后这里会显示历史。</td></tr>';
+                return;
+            }
+
+            // Sort by date descending (newest first)
+            entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            entries.forEach((entry, index) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+                tr.className = 'stagger-item';
+                tr.style.animationDelay = (index * 0.05) + 's';
+
+                // Project Name
+                const projectName = entry.projectName || 'Unknown';
+
+                // Config: modelSize, imgSize, epochs, batchSize
+                const configStr = `${entry.modelSize || '-'} | ${entry.imgSize || 640}px | ${entry.epochs || '-'}e | B${entry.batchSize || '-'}`;
+
+                // Training Metrics: Loss / mAP50 / mAP50-95
+                const loss = entry.finalLoss !== undefined ? entry.finalLoss.toFixed(3) : '-';
+                const map50 = entry.mAP50 !== undefined ? (entry.mAP50 * 100).toFixed(1) + '%' : '-';
+                const map5095 = entry.mAP5095 !== undefined ? (entry.mAP5095 * 100).toFixed(1) + '%' : '-';
+                const metricsStr = `
+                    <span style="background:rgba(255,100,100,0.2); color:#ff6b6b; padding:2px 6px; border-radius:4px; margin-right:4px; font-size:11px;">Loss: ${loss}</span>
+                    <span style="background:rgba(0,212,255,0.2); color:#0be881; padding:2px 6px; border-radius:4px; margin-right:4px; font-size:11px;">mAP50: ${map50}</span>
+                    <span style="background:rgba(100,200,255,0.2); color:#74b9ff; padding:2px 6px; border-radius:4px; font-size:11px;">mAP50-95: ${map5095}</span>
+                `;
+
+                // Date
+                const dateStr = entry.date || '-';
+
+                // Build row HTML (without button)
+                tr.innerHTML = `
+                    <td style="padding: 12px; font-weight: 500;">${projectName}</td>
+                    <td style="padding: 12px; font-size: 12px; color: #aaa;">${configStr}</td>
+                    <td style="padding: 12px;">${metricsStr}</td>
+                    <td style="padding: 12px; font-size: 12px; color: #aaa;">${dateStr}</td>
+                    <td style="padding: 12px; text-align: center;" class="action-cell"></td>
+                `;
+
+                // Create button programmatically to avoid escaping issues
+                const modelPath = entry.modelPath || '';
+                const actionCell = tr.querySelector('.action-cell');
+
+                if (modelPath && actionCell) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary btn-icon';
+                    btn.title = '打开模型所在文件夹';
+                    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+
+                    btn.onclick = function (e) {
+                        // Use proper path from closure
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            action: 'open_model_folder',
+                            path: modelPath
+                        }));
+                    };
+                    actionCell.appendChild(btn);
+                } else {
+                    if (actionCell) actionCell.textContent = '-';
+                }
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openModelFolder(modelPath) {
+            console.log("[openModelFolder] Called with:", modelPath);
+            addLog("正在打开文件夹: " + modelPath, "info");
+            if (!modelPath) {
+                addLog("路径为空，无法打开", "warning");
+                return;
+            }
+            try {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'open_model_folder',
+                    path: modelPath
+                }));
+                console.log("[openModelFolder] Message sent to backend");
+            } catch (err) {
+                console.error("[openModelFolder] Error:", err);
+                addLog("发送消息失败: " + err.message, "error");
+            }
+        }
+
+
+        function refreshModels() {
+            const path = getModelStoragePath();
+            console.log("[refreshModels] Final path:", path);
+
+            if (!path) {
+                console.warn("[refreshModels] No path available, cannot load models");
+                addLog("无法加载模型列表: 请先选择项目或设置模型存储路径", "warning");
+                return;
+            }
+
+            // Sync UI
+            document.getElementById('currentModelPath').value = path;
+            document.getElementById('modelStoragePath').value = path;
+
+            console.log("[refreshModels] Sending get_models request for:", path);
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_models',
+                path: path
+            }));
+        }
+
+        function filterModels() {
+            const query = document.getElementById('modelSearch').value.toLowerCase();
+            const filtered = currentModelList.filter(m => m.name.toLowerCase().includes(query));
+            renderModelList(filtered);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderModelList(models) {
+            const tbody = document.getElementById('modelTableBody');
+            tbody.innerHTML = '';
+
+            if (!models || models.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #aaa; padding: 20px;">No models found. Train one to see history!</td></tr>';
+                return;
+            }
+
+            models.forEach(model => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-color)';
+
+                // --- Metadata Parsing ---
+                let configStr = '<span style="color:#aaa;">-</span>';
+
+                if (model.metadata && model.metadata.paramsData) {
+                    const p = model.metadata.paramsData;
+                    configStr = `<span style="background:var(--bg-card); border:1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; color:var(--text-main); font-family:Consolas; font-size: 11px;">${escapeHtml(p.ModelSize)}</span> 
+                                     <span style="color:var(--text-sub); font-size:11px; margin-left: 4px;">${escapeHtml(p.ImgSize)}px</span>`;
+                }
+
+                const safeName = encodeURIComponent(model.name);
+                const displayName = escapeHtml(model.name);
+                const displaySize = escapeHtml(model.size);
+                const displayDate = escapeHtml(model.date);
+
+                // Name Column (Icon + Name)
+                const typeBadge = `<div style="display:flex; align-items:center; gap:8px;">
+                                    <div style="width: 32px; height: 32px; background: rgba(0, 137, 123, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00897B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:bold; font-size:13px; color: var(--text-main);">${displayName}</div>
+                                        <div style="font-size:11px; color: var(--text-light);">${displaySize}</div>
+                                    </div>
+                                  </div>`;
+
+                // Actions
+                const actions = `
+                        <button class="btn btn-secondary btn-icon" title="重命名" onclick="renameModel(decodeURIComponent('${safeName}'))" style="padding:6px; width: 32px; height: 32px;">
+                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="btn btn-danger btn-icon" title="删除" onclick="deleteModel(decodeURIComponent('${safeName}'))" style="padding:6px; width: 32px; height: 32px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" title="转换" onclick="convertModel(decodeURIComponent('${safeName}'))" style="padding:6px; width: 32px; height: 32px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                    `;
+
+                tr.innerHTML = `
+                    <td style="padding: 12px;">${typeBadge}</td>
+                    <td style="padding: 12px; font-size: 13px;">${configStr}</td>
+                    <td style="padding: 12px; font-size: 12px; color: var(--text-sub);">${displayDate}</td>
+                    <td style="padding: 12px; text-align: right; display:flex; gap:6px; justify-content:flex-end;">${actions}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openModelFolder() {
+            const path = getModelStoragePath();
+            if (path) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'open_output',
+                    path: path
+                }));
+            }
+        }
+
+        function renameModel(oldName) {
+            const newName = prompt("请输入新名称 (无需后缀):", oldName.replace(/\.(onnx|pt)$/i, ""));
+            if (newName && newName !== oldName.replace(/\.(onnx|pt)$/i, "")) {
+                const ext = oldName.split('.').pop();
+                const fullName = newName.endsWith('.' + ext) ? newName : newName + '.' + ext;
+
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'rename_model',
+                    path: getModelStoragePath(),
+                    oldName: oldName,
+                    newName: fullName
+                }));
+            }
+        }
+
+        function deleteModel(fileName) {
+            if (confirm(`确定要删除模型 ${fileName} 吗？此操作不可恢复。`)) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_model',
+                    path: getModelStoragePath(),
+                    fileName: fileName
+                }));
+            }
+        }
+
+        function convertModel(fileName) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'convert_model',
+                sourcePath: getModelStoragePath() + "\\" + fileName,
+                targetDir: getModelStoragePath(),
+                pythonPath: document.getElementById('pythonPath').value
+            }));
+        }
+
+        function openOutputFolder() {
+            const p = document.getElementById('targetPath').value;
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'open_output', path: p
+            }));
+        }
+
+        // Create Project Modal
+        function openCreateProjectModal() {
+            document.getElementById('createProjectModal').style.display = 'flex';
+        }
+
+        function closeCreateProjectModal() {
+            document.getElementById('createProjectModal').style.display = 'none';
+        }
+
+        function createProject() {
+            const name = document.getElementById('newProjectName').value;
+            const root = document.getElementById('newProjectRoot').value;
+            const classes = document.getElementById('newProjectClasses').value;
+
+            if (!name || !root) {
+                showMiniToast('warning', '提示', '项目名称和根目录不能为空');
+                return;
+            }
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'create_project',
+                name: name,
+                rootPath: root,
+                classes: classes
+            }));
+
+            closeCreateProjectModal();
+        }
+
+        function deleteProject() {
+            if (!currentProjectConfig) return;
+            const idx = document.getElementById('projectSelect').selectedIndex;
+            if (idx < 0) return;
+
+            if (confirm('确定要删除当前项目吗？此操作仅移除列表项，不会删除硬盘文件。')) {
+                window.chrome.webview.postMessage(JSON.stringify({
+                    action: 'delete_project',
+                    index: idx
+                }));
+            }
+        }
+
+        // Defect Modal
+        function openAugmentModal() {
+            document.getElementById('augmentModal').style.display = 'flex';
+        }
+
+        function closeAugmentModal() {
+            document.getElementById('augmentModal').style.display = 'none';
+        }
+
+        function startAugmentation() {
+            const conf = {
+                action: 'defect_augmentation',
+                sourcePath: document.getElementById('augmentSourcePath').value,
+                holeAssetsPath: document.getElementById('holeAssetsPath').value,
+                mutationRate: parseInt(document.getElementById('mutationRate').value)
+            };
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+        }
+
+        function inferYoloVersionFromModelSize(modelSizeValue) {
+            if (!modelSizeValue) return 'yolov8';
+            if (modelSizeValue.startsWith('v26')) return 'yolo26';
+            if (modelSizeValue.startsWith('v11')) return 'yolo11';
+            return 'yolov8';
+        }
+
+        function inferModelSizeCode(modelSizeValue) {
+            if (!modelSizeValue || modelSizeValue.length < 2) return 's';
+            return modelSizeValue.slice(-1).toLowerCase();
+        }
+
+        function openExportZipModal() {
+            if (!currentProjectConfig) {
+                showMiniToast('warning', '提示', '请先选择项目');
+                return;
+            }
+
+            const modal = document.getElementById('exportZipModal');
+            const exportListDiv = document.getElementById('exportDataSourceList');
+            if (!modal || !exportListDiv) {
+                console.error('Export ZIP modal elements are missing in DOM.');
+                showMiniToast('error', '界面错误', '导出弹窗未正确加载，请重启后重试');
+                return;
+            }
+
+            const mainCheckboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]');
+            exportListDiv.innerHTML = '';
+
+            if (mainCheckboxes.length === 0) {
+                exportListDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">当前项目下未发现可选子文件夹</div>';
+            } else {
+                mainCheckboxes.forEach((cb, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'checklist-item';
+
+                    const id = 'export_cb_' + i;
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = id;
+                    input.value = cb.value;
+                    input.checked = cb.checked;
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', id);
+                    label.innerText = cb.value;
+
+                    item.appendChild(input);
+                    item.appendChild(label);
+                    exportListDiv.appendChild(item);
+                });
+            }
+
+            // 默认同步当前训练参数
+            const modelSizeMain = document.getElementById('modelSize');
+            const epochsMain = document.getElementById('epochs');
+            const batchMain = document.getElementById('batchSize');
+            const imgMain = document.getElementById('imgSize');
+            const patienceMain = document.getElementById('patience');
+            const workersMain = document.getElementById('workers');
+            const gpuMain = document.getElementById('gpuIndex');
+
+            const exportYoloVersion = document.getElementById('exportYoloVersion');
+            const exportModelSize = document.getElementById('exportModelSize');
+            const exportEpochs = document.getElementById('exportEpochs');
+            const exportBatchSize = document.getElementById('exportBatchSize');
+            const exportImgSize = document.getElementById('exportImgSize');
+            const exportPatience = document.getElementById('exportPatience');
+            const exportWorkers = document.getElementById('exportWorkers');
+            const exportGpuIndex = document.getElementById('exportGpuIndex');
+
+            const modelSizeVal = modelSizeMain ? modelSizeMain.value : 'v8s';
+            if (exportYoloVersion) exportYoloVersion.value = inferYoloVersionFromModelSize(modelSizeVal);
+            if (exportModelSize) exportModelSize.value = inferModelSizeCode(modelSizeVal);
+            if (exportEpochs && epochsMain) exportEpochs.value = epochsMain.value;
+            if (exportBatchSize && batchMain) exportBatchSize.value = batchMain.value;
+            if (exportImgSize && imgMain) exportImgSize.value = imgMain.value;
+            if (exportPatience && patienceMain) exportPatience.value = patienceMain.value;
+            if (exportWorkers && workersMain) exportWorkers.value = workersMain.value;
+            if (exportGpuIndex && gpuMain) exportGpuIndex.value = gpuMain.value;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeExportZipModal() {
+            const modal = document.getElementById('exportZipModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function startExportZip() {
+            if (!currentProjectConfig) return;
+
+            const yoloVersionInput = document.getElementById('exportYoloVersion');
+            const modelSizeInput = document.getElementById('exportModelSize');
+            const splitRatioInput = document.getElementById('exportSplitRatio');
+            const epochsInput = document.getElementById('exportEpochs');
+            const batchInput = document.getElementById('exportBatchSize');
+            const imgInput = document.getElementById('exportImgSize');
+            const patienceInput = document.getElementById('exportPatience');
+            const workersInput = document.getElementById('exportWorkers');
+            const gpuInput = document.getElementById('exportGpuIndex');
+            if (!yoloVersionInput || !modelSizeInput || !splitRatioInput || !epochsInput || !batchInput || !imgInput || !patienceInput || !workersInput || !gpuInput) {
+                showMiniToast('error', '界面错误', '导出参数控件缺失');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('#exportDataSourceList input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                showMiniToast('warning', '提示', '请至少勾选一个数据源文件夹');
+                return;
+            }
+
+            const sourcePaths = Array.from(checkboxes).map(cb => `${currentProjectConfig.RootPath}\\${cb.value}`);
+            const splitRatioValue = parseInt(splitRatioInput.value, 10);
+            const splitRatio = Number.isFinite(splitRatioValue) ? splitRatioValue / 100.0 : 0.8;
+            const epochs = parseInt(epochsInput.value, 10);
+            const batchSize = parseInt(batchInput.value, 10);
+            const imgSize = parseInt(imgInput.value, 10);
+            const patience = parseInt(patienceInput.value, 10);
+            const workers = parseInt(workersInput.value, 10);
+            const gpuIndex = gpuInput.value || "0";
+
+            const conf = {
+                action: 'export_dataset_zip',
+                sourcePaths: sourcePaths,
+                yoloVersion: yoloVersionInput.value,
+                modelSize: modelSizeInput.value,
+                epochs: Number.isFinite(epochs) ? epochs : 300,
+                batchSize: Number.isFinite(batchSize) ? batchSize : 16,
+                imgSize: Number.isFinite(imgSize) ? imgSize : 640,
+                patience: Number.isFinite(patience) ? patience : 50,
+                workers: Number.isFinite(workers) ? workers : 8,
+                gpuIndex: gpuIndex,
+                splitRatio: splitRatio,
+                classes: currentProjectConfig.Classes,
+                projectName: currentProjectConfig.Name
+            };
+
+            updateProgress(0, '正在初始化 ZIP 导出...');
+            addLog('准备导出 YOLO 数据集 ZIP...', 'info');
+            switchTab('config');
+
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+            closeExportZipModal();
+
+            const exportBtn = document.getElementById('btnExportZip');
+            if (exportBtn) {
+                exportBtn.disabled = true;
+            }
+        }
+
+        function normalizeKaggleSlug(value) {
+            return (value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '');
+        }
+
+        function fillCloudFields(prefix) {
+            const modelSizeMain = document.getElementById('modelSize');
+            const modelSizeVal = modelSizeMain ? modelSizeMain.value : 'v8s';
+            const yoloVersion = document.getElementById(prefix + 'YoloVersion');
+            const modelSize = document.getElementById(prefix + 'ModelSize');
+            const epochs = document.getElementById(prefix + 'Epochs');
+            const batch = document.getElementById(prefix + 'BatchSize');
+            const img = document.getElementById(prefix + 'ImgSize');
+            const patience = document.getElementById(prefix + 'Patience');
+            const workers = document.getElementById(prefix + 'Workers');
+            const gpu = document.getElementById(prefix + 'GpuIndex');
+
+            if (yoloVersion) yoloVersion.value = inferYoloVersionFromModelSize(modelSizeVal);
+            if (modelSize) modelSize.value = inferModelSizeCode(modelSizeVal);
+            if (epochs) epochs.value = document.getElementById('epochs').value;
+            if (batch) batch.value = document.getElementById('batchSize').value;
+            if (img) img.value = document.getElementById('imgSize').value;
+            if (patience) patience.value = document.getElementById('patience').value;
+            if (workers) workers.value = document.getElementById('workers').value;
+            if (gpu) gpu.value = document.getElementById('gpuIndex').value;
+        }
+
+        function openKaggleCloudModal() {
+            if (!currentProjectConfig) {
+                showMiniToast('warning', '提示', '请先选择项目');
+                return;
+            }
+
+            const modal = document.getElementById('kaggleCloudModal');
+            const listDiv = document.getElementById('kaggleDataSourceList');
+            if (!modal || !listDiv) {
+                showMiniToast('error', '界面错误', 'Kaggle 弹窗未正确加载');
+                return;
+            }
+
+            const username = document.getElementById('kaggleUsername');
+            const datasetSlug = document.getElementById('kaggleDatasetSlug');
+            const kernelSlug = document.getElementById('kaggleKernelSlug');
+            const savedUser = localStorage.getItem('insight_kaggle_username') || '';
+            const baseSlug = normalizeKaggleSlug(currentProjectConfig.Name || 'insight-yolo');
+            if (username && !username.value) username.value = savedUser;
+            if (datasetSlug && !datasetSlug.value) datasetSlug.value = `${baseSlug}-dataset`;
+            if (kernelSlug && !kernelSlug.value) kernelSlug.value = `${baseSlug}-train`;
+
+            const mainCheckboxes = document.querySelectorAll('#dataSourceList input[type="checkbox"]');
+            listDiv.innerHTML = '';
+            if (mainCheckboxes.length === 0) {
+                listDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #aab8c2;">当前项目下未发现可选子文件夹</div>';
+            } else {
+                mainCheckboxes.forEach((cb, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'checklist-item';
+                    const id = 'kaggle_cb_' + i;
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = id;
+                    input.value = cb.value;
+                    input.checked = cb.checked;
+                    const label = document.createElement('label');
+                    label.setAttribute('for', id);
+                    label.innerText = cb.value;
+                    item.appendChild(input);
+                    item.appendChild(label);
+                    listDiv.appendChild(item);
+                });
+            }
+
+            fillCloudFields('kaggle');
+            modal.style.display = 'flex';
+        }
+
+        function closeKaggleCloudModal() {
+            const modal = document.getElementById('kaggleCloudModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function startKaggleCloudTraining() {
+            if (!currentProjectConfig) return;
+
+            const username = document.getElementById('kaggleUsername').value.trim();
+            if (!username) {
+                showMiniToast('warning', '提示', '请填写 Kaggle 用户名');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('#kaggleDataSourceList input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                showMiniToast('warning', '提示', '请至少勾选一个数据源文件夹');
+                return;
+            }
+
+            const sourcePaths = Array.from(checkboxes).map(cb => `${currentProjectConfig.RootPath}\\${cb.value}`);
+            const splitRatioValue = parseInt(document.getElementById('kaggleSplitRatio').value, 10);
+            const conf = {
+                action: 'start_kaggle_training',
+                sourcePaths: sourcePaths,
+                kaggleUsername: username,
+                datasetSlug: normalizeKaggleSlug(document.getElementById('kaggleDatasetSlug').value),
+                kernelSlug: normalizeKaggleSlug(document.getElementById('kaggleKernelSlug').value),
+                yoloVersion: document.getElementById('kaggleYoloVersion').value,
+                modelSize: document.getElementById('kaggleModelSize').value,
+                epochs: parseInt(document.getElementById('kaggleEpochs').value, 10) || 300,
+                batchSize: parseInt(document.getElementById('kaggleBatchSize').value, 10) || 16,
+                imgSize: parseInt(document.getElementById('kaggleImgSize').value, 10) || 640,
+                patience: parseInt(document.getElementById('kagglePatience').value, 10) || 50,
+                workers: parseInt(document.getElementById('kaggleWorkers').value, 10) || 8,
+                gpuIndex: document.getElementById('kaggleGpuIndex').value || '0',
+                splitRatio: Number.isFinite(splitRatioValue) ? splitRatioValue / 100.0 : 0.8,
+                classes: currentProjectConfig.Classes,
+                projectName: currentProjectConfig.Name
+            };
+
+            localStorage.setItem('insight_kaggle_username', username);
+            localStorage.setItem('insight_kaggle_kernel_id', `${normalizeKaggleSlug(username)}/${conf.kernelSlug}`);
+            updateProgress(0, '准备提交 Kaggle 云训练...');
+            addLog('准备提交 Kaggle 云训练...', 'info');
+            switchTab('monitor');
+            window.chrome.webview.postMessage(JSON.stringify(conf));
+            closeKaggleCloudModal();
+
+            const kaggleBtn = document.getElementById('btnKaggleTrain');
+            if (kaggleBtn) kaggleBtn.disabled = true;
+        }
+
+        function downloadKaggleOutput() {
+            const username = document.getElementById('kaggleUsername').value.trim();
+            const kernelSlug = normalizeKaggleSlug(document.getElementById('kaggleKernelSlug').value);
+            const storedKernel = localStorage.getItem('insight_kaggle_kernel_id') || '';
+            const kernelId = username && kernelSlug ? `${normalizeKaggleSlug(username)}/${kernelSlug}` : storedKernel;
+            if (!kernelId) {
+                showMiniToast('warning', '提示', '请先提交或填写 Notebook Slug');
+                return;
+            }
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'download_kaggle_output',
+                kernelId: kernelId,
+                outputDir: getModelStoragePath()
+            }));
+        }
+
+        // Helper
+        function selectFolder(type) {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder',
+                type: type
+            }));
+        }
+
+        function startToolConversion() {
+            const src = document.getElementById('toolSourcePath').value;
+            const tgt = document.getElementById('toolTargetPath').value;
+
+            if (!src || !tgt) {
+                showMiniToast('warning', '提示', '请先选择源文件夹和目标路径');
+                return;
+            }
+
+            // Clear log
+            document.getElementById('toolConsole').innerHTML = '<div class="log-item"><span class="log-time">[System]</span>Starting conversion...</div>';
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'convert_tool',
+                sourcePath: src,
+                targetPath: tgt
+            }));
+        }
+
+        // ========== Python Path Persistence ==========
+        const DEFAULT_PYTHON_PATH = 'C:\\conda_envs\\yolo\\python.exe';
+
+        function loadPythonPath() {
+            // 请求后端加载默认路径
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_default_python_path'
+            }));
+        }
+
+        function savePythonPath(path) {
+            // 临时保存（可选，目前不做持久化）
+        }
+
+        function saveAsDefaultPythonPath() {
+            var currentPath = document.getElementById('pythonPath').value;
+            if (!currentPath || currentPath.trim() === '') {
+                showMiniToast('warning', '设置失败', '请先输入有效的 Python 环境路径');
+                return;
+            }
+            // 通过后端保存为默认地址
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'save_default_python_path',
+                path: currentPath
+            }));
+        }
+
+        function showMiniToast(type, title, message) {
+            // Remove old toast
+            var oldToast = document.querySelector('.mini-toast');
+            if (oldToast) oldToast.remove();
+
+            // Determine Icon & Color
+            var iconSvg = '';
+            var bg = '';
+
+            if (type === 'success') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+                bg = 'linear-gradient(135deg, #00897B, #26A69A)';
+            } else if (type === 'warning') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+                bg = 'linear-gradient(135deg, #FF9800, #F57C00)';
+            } else if (type === 'error') {
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+                bg = 'linear-gradient(135deg, #E53935, #C62828)';
+            } else {
+                // Info / Default
+                iconSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+                bg = 'linear-gradient(135deg, #455A64, #607D8B)';
+            }
+
+            // Create new toast
+            var toast = document.createElement('div');
+            toast.className = 'mini-toast';
+            toast.style.background = bg;
+
+            toast.innerHTML = '<div class="mini-toast-icon">' + iconSvg + '</div>' +
+                '<div class="mini-toast-content">' +
+                '<div class="mini-toast-title">' + title + '</div>' +
+                '<div class="mini-toast-message">' + message + '</div>' +
+                '</div>';
+
+            document.body.appendChild(toast);
+
+            // Animation
+            setTimeout(function () { toast.classList.add('show'); }, 50);
+
+            // Auto Dismiss
+            setTimeout(function () {
+                toast.classList.remove('show');
+                setTimeout(function () { toast.remove(); }, 400);
+            }, 3000);
+        }
+
+
+        // ========== Labeling Logic (SAM2) ==========
+        const lblState = {
+            images: [],
+            currentIndex: -1,
+            image: null,      // Image Object
+            imgW: 0,
+            imgH: 0,
+
+            // Viewport
+            scale: 1,
+            offset: { x: 0, y: 0 },
+            isDragging: false,
+            lastMouse: { x: 0, y: 0 },
+
+            // Annotation
+            mode: 'auto',     // 'auto' | 'rect'
+            prompts: [],      // {x, y, isPositive} (Image Space)
+            tempBox: null,    // {x, y, w, h} (Image Space) - From SAM
+            manualStart: null,// {x, y} (Image Space) - For manual rect
+
+            // Data
+            annotations: [],  // {labelIndex, bbox: [x,y,w,h]}
+            labels: [],       // Strings
+            activeLabelIndex: 0,
+
+            samLoaded: false
+        };
+
+        const canvas = document.getElementById('labelingCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+
+        // --- Layout & Resize ---
+        function resizeCanvas() {
+            if (!canvasWrapper) return;
+            canvas.width = canvasWrapper.clientWidth;
+            canvas.height = canvasWrapper.clientHeight;
+            renderCanvas();
+        }
+        new ResizeObserver(resizeCanvas).observe(canvasWrapper);
+
+        // --- Core Interaction ---
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+                // Pan
+                lblState.isDragging = true;
+                lblState.lastMouse = { x: e.clientX, y: e.clientY };
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+
+            if (!lblState.image) return;
+
+            const rect = canvas.getBoundingClientRect();
+            // Mouse to Image Coords
+            const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+            const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+            if (mx < 0 || my < 0 || mx > lblState.imgW || my > lblState.imgH) return;
+
+            if (lblState.mode === 'auto') {
+                // 记录起始点，在 mouseup 时决定是点击还是拖拽
+                lblState.autoStart = { x: mx, y: my, button: e.button };
+                lblState.tempBox = null; // 清空临时框
+            } else if (lblState.mode === 'rect') {
+                if (e.button === 0) {
+                    lblState.manualStart = { x: mx, y: my };
+                    lblState.tempBox = { x: mx, y: my, w: 0, h: 0 }; // Init temp box
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (lblState.isDragging) {
+                const dx = e.clientX - lblState.lastMouse.x;
+                const dy = e.clientY - lblState.lastMouse.y;
+                lblState.offset.x += dx;
+                lblState.offset.y += dy;
+                lblState.lastMouse = { x: e.clientX, y: e.clientY };
+                renderCanvas();
+                return;
+            }
+
+            // Update Rect Drag for rect mode
+            if (lblState.mode === 'rect' && lblState.manualStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const w = mx - lblState.manualStart.x;
+                const h = my - lblState.manualStart.y;
+
+                // Normalization handled at render/save
+                lblState.tempBox = {
+                    x: w > 0 ? lblState.manualStart.x : mx,
+                    y: h > 0 ? lblState.manualStart.y : my,
+                    w: Math.abs(w),
+                    h: Math.abs(h)
+                };
+                renderCanvas();
+            }
+
+            // 自动模式的拖拽预览
+            if (lblState.mode === 'auto' && lblState.autoStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const dx = mx - lblState.autoStart.x;
+                const dy = my - lblState.autoStart.y;
+
+                // 如果移动距离超过 5px，显示临时框
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    lblState.tempBox = {
+                        x: dx > 0 ? lblState.autoStart.x : mx,
+                        y: dy > 0 ? lblState.autoStart.y : my,
+                        w: Math.abs(dx),
+                        h: Math.abs(dy)
+                    };
+                    renderCanvas();
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (lblState.isDragging) {
+                lblState.isDragging = false;
+                canvas.style.cursor = 'default';
+                return;
+            }
+            if (lblState.mode === 'rect' && lblState.manualStart) {
+                // Finish Rect
+                if (lblState.tempBox && lblState.tempBox.w > 5 && lblState.tempBox.h > 5) {
+                    // Auto commit manual rect
+                    commitAnnotation();
+                } else {
+                    lblState.tempBox = null;
+                }
+                lblState.manualStart = null;
+                renderCanvas();
+            }
+
+            // 自动模式：判断是点击还是拖拽
+            if (lblState.mode === 'auto' && lblState.autoStart) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = (e.clientX - rect.left - lblState.offset.x) / lblState.scale;
+                const my = (e.clientY - rect.top - lblState.offset.y) / lblState.scale;
+
+                const dx = mx - lblState.autoStart.x;
+                const dy = my - lblState.autoStart.y;
+
+                if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                    // 点击模式：添加点提示
+                    const isPositive = lblState.autoStart.button === 0;
+                    lblState.prompts.push({ x: lblState.autoStart.x, y: lblState.autoStart.y, isPositive });
+                    requestSAMInference();
+                } else {
+                    // 拖拽模式：清空之前的点提示，发送框提示
+                    lblState.prompts = [];
+                    requestSAMInferenceWithBox(lblState.tempBox);
+                }
+
+                lblState.autoStart = null;
+                renderCanvas();
+            }
+        });
+
+        // Prevent Context Menu on Canvas (for Right Click usage)
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoomSpeed = 0.1;
+            const delta = -Math.sign(e.deltaY) * zoomSpeed;
+            const newScale = Math.max(0.1, Math.min(10, lblState.scale * (1 + delta)));
+
+            // Zoom towards mouse
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const imgX = (mx - lblState.offset.x) / lblState.scale;
+            const imgY = (my - lblState.offset.y) / lblState.scale;
+
+            lblState.offset.x = mx - imgX * newScale;
+            lblState.offset.y = my - imgY * newScale;
+            lblState.scale = newScale;
+
+            renderCanvas();
+            updateCanvasInfo();
+        });
+
+        // --- Rendering ---
+        function renderCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(lblState.offset.x, lblState.offset.y);
+            ctx.scale(lblState.scale, lblState.scale);
+
+            // 1. Image
+            if (lblState.image) {
+                ctx.drawImage(lblState.image, 0, 0);
+            }
+
+            // 2. Existing Annotations
+            ctx.lineWidth = 2 / lblState.scale;
+            lblState.annotations.forEach(ann => {
+                ctx.strokeStyle = '#00E676'; // Customize color per label later
+                ctx.fillStyle = 'rgba(0, 230, 118, 0.2)';
+                const b = ann.bbox;
+                ctx.beginPath();
+                ctx.rect(b.x, b.y, b.w, b.h);
+                ctx.stroke();
+                ctx.fill();
+
+                // Label Text
+                ctx.fillStyle = '#00E676';
+                ctx.font = `${14 / lblState.scale}px Arial`;
+                const labelName = lblState.labels[ann.labelIndex] || ann.labelIndex;
+                ctx.fillText(labelName, b.x, b.y - 5 / lblState.scale);
+            });
+
+            // 3. Current Temp Box (Active)
+            if (lblState.tempBox) {
+                ctx.strokeStyle = '#2979FF';
+                ctx.lineWidth = 2 / lblState.scale;
+                ctx.setLineDash([5 / lblState.scale, 5 / lblState.scale]);
+                const b = lblState.tempBox;
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+                ctx.setLineDash([]);
+            }
+
+            // 4. Prompts
+            lblState.prompts.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5 / lblState.scale, 0, Math.PI * 2);
+                ctx.fillStyle = p.isPositive ? '#00E676' : '#FF1744';
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 2 / lblState.scale;
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            ctx.restore();
+            updateCanvasInfo();
+        }
+
+        function updateCanvasInfo() {
+            const info = document.getElementById('canvasInfo');
+            if (lblState.image) {
+                const z = Math.round(lblState.scale * 100);
+                info.innerText = `${lblState.imgW}x${lblState.imgH} | ${z}%`;
+            } else {
+                info.innerText = "No Image";
+            }
+        }
+
+        // --- Actions ---
+
+        function setLabelingMode(m) {
+            lblState.mode = m;
+            document.getElementById('tool-auto').classList.toggle('active', m === 'auto');
+            document.getElementById('tool-rect').classList.toggle('active', m === 'rect');
+        }
+
+        function labelingAction(act) {
+            if (act === 'undo') {
+                if (lblState.mode === 'auto' && lblState.prompts.length > 0) {
+                    lblState.prompts.pop();
+                    requestSAMInference();
+                } else if (lblState.mode === 'rect') {
+                    // Undo rect? maybe just clear
+                    lblState.tempBox = null;
+                }
+            } else if (act === 'clear') {
+                lblState.prompts = [];
+                lblState.tempBox = null;
+                lblState.manualStart = null;
+            } else if (act === 'complete') {
+                commitAnnotation();
+            }
+            renderCanvas();
+        }
+
+        function commitAnnotation() {
+            if (!lblState.tempBox) return;
+            // Check if label exists
+            if (lblState.labels.length === 0) {
+                showMiniToast('warning', '无标签', '请先添加至少一个标签类别');
+                return;
+            }
+
+            lblState.annotations.push({
+                labelIndex: lblState.activeLabelIndex,
+                bbox: { ...lblState.tempBox }
+            });
+
+            // Clear current state
+            lblState.prompts = [];
+            lblState.tempBox = null;
+            renderCanvas();
+            renderAnnotationList();
+
+            // Auto Save to Backend
+            saveAnnotations();
+        }
+
+        // --- Shortcuts ---
+        window.addEventListener('keydown', e => {
+            if (!document.getElementById('view-labeling').classList.contains('active')) return;
+            if (e.target.tagName === 'INPUT') return; // Ignore input fields
+
+            switch (e.key.toLowerCase()) {
+                case 'a': prevImage(); break;
+                case 'd': nextImage(); break;
+                case 'q': setLabelingMode('auto'); break;
+                case 'r': setLabelingMode('rect'); break;
+                case 'f': labelingAction('complete'); break;
+                case 'enter': labelingAction('complete'); break;
+                case 'b': labelingAction('clear'); break;
+                case 'escape': labelingAction('clear'); break;
+                case 'z': if (e.ctrlKey) labelingAction('undo'); break;
+            }
+        });
+
+        // --- Backend Communication ---
+        function openLabelingFolder() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'select_folder',
+                type: 'labeling'
+            }));
+        }
+
+        function loadSAMModel() {
+            const btn = document.getElementById('btnLoadModel');
+            const modelName = document.getElementById('samModelSelect').value;
+
+            if (!modelName) {
+                showMiniToast('error', '未选择模型', '请先在下拉列表中选择一个模型');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "⏳ 加载中...";
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-primary');
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'load_sam_model',
+                modelName: modelName,
+                useGpu: document.getElementById('samUseGpu').checked
+            }));
+        }
+
+        function requestSAMInference() {
+            if (lblState.prompts.length === 0) {
+                lblState.tempBox = null;
+                renderCanvas();
+                return;
+            }
+            if (!lblState.samLoaded) return; // Silent return if model not ready
+
+            const threshold = parseFloat(document.getElementById('samThreshold').value) || 0;
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'sam_inference',
+                prompts: lblState.prompts,
+                threshold: threshold,
+                origW: lblState.imgW,
+                origH: lblState.imgH
+            }));
+        }
+
+        function requestSAMInferenceWithBox(box) {
+            if (!box || box.w < 5 || box.h < 5) {
+                lblState.tempBox = null;
+                renderCanvas();
+                return;
+            }
+            if (!lblState.samLoaded) {
+                showMiniToast('warning', '模型未加载', '请先加载 SAM 模型');
+                return;
+            }
+
+            const threshold = parseFloat(document.getElementById('samThreshold').value) || 0;
+            // 发送带 boxPrompt 的推理请求
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'sam_inference',
+                boxPrompt: {
+                    x1: box.x,
+                    y1: box.y,
+                    x2: box.x + box.w,
+                    y2: box.y + box.h
+                },
+                threshold: threshold,
+                origW: lblState.imgW,
+                origH: lblState.imgH
+            }));
+        }
+
+        function loadImage(index) {
+            if (index < 0 || index >= lblState.images.length) return;
+
+            // Save current before switching?
+            // saveAnnotations(); // Auto-saved on commit, but maybe final check?
+
+            const item = lblState.images[index];
+            lblState.currentIndex = index;
+            document.getElementById('currentImageName').innerText = item.name;
+
+            // Update List UI
+            document.querySelectorAll('.image-list-item').forEach((el, i) => {
+                el.classList.toggle('active', i === index);
+            });
+
+            // Request Image Data (Base64)
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_image_data',
+                path: item.path
+            }));
+        }
+
+        function nextImage() { loadImage(lblState.currentIndex + 1); }
+        function prevImage() { loadImage(lblState.currentIndex - 1); }
+
+        function saveAnnotations() {
+            if (!lblState.image) return;
+            const currentItem = lblState.images[lblState.currentIndex];
+
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'save_annotations',
+                imagePath: currentItem.path,
+                annotations: lblState.annotations,
+                width: lblState.imgW,
+                height: lblState.imgH,
+                labels: lblState.labels
+            }));
+        }
+
+        // --- UI Rendering ---
+        function renderLabelList() {
+            const container = document.getElementById('labelListContainer');
+            container.innerHTML = '';
+            lblState.labels.forEach((lbl, idx) => {
+                const el = document.createElement('div');
+                el.className = `label-chip ${idx === lblState.activeLabelIndex ? 'active' : ''}`;
+                el.onclick = () => {
+                    lblState.activeLabelIndex = idx;
+                    renderLabelList();
+                };
+                el.innerHTML = `<span>${idx}: ${lbl}</span>`;
+                container.appendChild(el);
+            });
+        }
+
+        function renderAnnotationList() {
+            const container = document.getElementById('annotationListContainer');
+            container.innerHTML = '';
+            lblState.annotations.forEach((ann, idx) => {
+                const el = document.createElement('div');
+                el.className = 'label-chip'; // reuse style
+                const labelName = lblState.labels[ann.labelIndex] || ann.labelIndex;
+                el.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-weight:bold; margin-right:6px;">${labelName}</span>
+                    </div>
+                    <span onclick="deleteAnnotation(${idx})" style="color:#FF1744; cursor:pointer;">×</span>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function deleteAnnotation(idx) {
+            lblState.annotations.splice(idx, 1);
+            renderAnnotationList();
+            renderCanvas();
+            saveAnnotations();
+        }
+
+        function addLabel() {
+            const name = prompt("输入新类别名称 (English):");
+            if (name && !lblState.labels.includes(name)) {
+                lblState.labels.push(name);
+                renderLabelList();
+            }
+        }
+
+        // Message Handling Extensions
+        const originalMsgHandler = window.chrome.webview.removeEventListener ? null : null; // Just extending logic
+        window.chrome.webview.addEventListener('message', event => {
+            const data = JSON.parse(event.data);
+
+            if (data.action === 'labeling_folder_loaded') {
+                lblState.images = data.images.map(p => ({
+                    path: p,
+                    name: p.split(/[\\/]/).pop(),
+                    status: 'new'
+                }));
+                // Render List
+                const container = document.getElementById('labelingImageList');
+                container.innerHTML = '';
+                lblState.images.forEach((img, idx) => {
+                    const el = document.createElement('div');
+                    el.className = 'image-list-item';
+                    el.innerText = img.name;
+                    el.onclick = () => loadImage(idx);
+                    container.appendChild(el);
+                });
+
+                // Load Labels if provided
+                if (data.labels) {
+                    lblState.labels = data.labels;
+                    renderLabelList();
+                }
+            }
+            else if (data.action === 'sam_models_loaded') {
+                const select = document.getElementById('samModelSelect');
+                if (select) {
+                    const currentVal = select.value;
+                    select.innerHTML = '';
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m;
+                            opt.innerText = m;
+                            select.appendChild(opt);
+                        });
+                        // 尽量保持之前的选择
+                        if (data.models.includes(currentVal)) {
+                            select.value = currentVal;
+                        }
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = "";
+                        opt.innerText = "未找到模型";
+                        select.appendChild(opt);
+                    }
+                }
+                // 如果有待执行的自动加载，现在执行
+                if (lblState.pendingAutoLoad && data.models && data.models.length > 0) {
+                    lblState.pendingAutoLoad = false;
+                    const btn = document.getElementById('btnLoadModel');
+                    if (btn && !btn.disabled) {
+                        loadSAMModel();
+                    }
+                }
+            }
+            else if (data.action === 'sam_model_loaded') {
+                lblState.samLoaded = true;
+                lblState.currentModel = data.modelName || 'unknown';
+                const btn = document.getElementById('btnLoadModel');
+                btn.disabled = false; // 保持可点击状态以便切换模型
+                btn.innerText = "✓ " + lblState.currentModel;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-success');
+                showMiniToast('success', '模型加载成功', lblState.currentModel + ' 已准备就绪');
+
+                // [Fix] 如果当前已有图片，重新触发编码 (Reload Encoding if image exists)
+                if (lblState.image) {
+                    addLog("检测到已加载图片，正在重新通过模型编码...", "info");
+                    // 重新发送 encode_image 请求
+                    window.chrome.webview.postMessage(JSON.stringify({
+                        action: 'encode_image',
+                        path: lblState.images[lblState.currentIndex].path
+                    }));
+                }
+            }
+            else if (data.action === 'sam_result') {
+                // data.bbox = {x, y, w, h}
+                lblState.tempBox = data.bbox;
+                renderCanvas();
+            }
+            else if (data.action === 'image_encoded') {
+                document.getElementById('canvasInfo').innerText = "Ready";
+                // If existed annotations returned
+                if (data.existing && data.existing.length > 0) {
+                    lblState.annotations = data.existing;
+                    renderCanvas();
+                    renderAnnotationList();
+                }
+            }
+            else if (data.action === 'image_data_loaded') {
+                // Base64 Loaded
+                const img = new Image();
+                img.onload = () => {
+                    lblState.image = img;
+                    lblState.imgW = img.width;
+                    lblState.imgH = img.height;
+
+                    // Fit to view
+                    const wrapper = document.getElementById('canvasWrapper');
+                    if (wrapper) {
+                        const scaleX = wrapper.clientWidth / img.width;
+                        const scaleY = wrapper.clientHeight / img.height;
+                        lblState.scale = Math.min(scaleX, scaleY) * 0.9;
+                        lblState.offset.x = (wrapper.clientWidth - img.width * lblState.scale) / 2;
+                        lblState.offset.y = (wrapper.clientHeight - img.height * lblState.scale) / 2;
+                    }
+
+                    // Clear state
+                    lblState.prompts = [];
+                    lblState.tempBox = null;
+                    lblState.annotations = [];
+
+                    // Request Encode (for SAM2 backend)
+                    if (lblState.samLoaded) {
+                        window.chrome.webview.postMessage(JSON.stringify({
+                            action: 'encode_image',
+                            path: data.path
+                        }));
+                    } else {
+                        addLog("模型尚未加载，暂不进行编码 (Model not ready)", "info");
+                    }
+
+                    renderCanvas();
+                };
+                img.src = "data:image/jpeg;base64," + data.base64;
+            }
+        });
+
+
+        setTimeout(() => {
+            loadProjects();
+            loadPythonPath();
+        }, 500); // Trigger auto load
+    </script>
+</body>
+
+</html>
