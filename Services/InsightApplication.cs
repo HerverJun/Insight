@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Text.Json;
 using Insight.Bridge;
+using Insight.Services.Industrial;
 using Insight.Services.Training;
 using Insight.Training;
 using OpenCvSharp;
@@ -15,6 +16,7 @@ namespace Insight.Services
         private readonly IUiDispatcher _ui;
         private readonly IAppDialogService _dialogs;
         private readonly TrainingOrchestrator _training;
+        private readonly IndustrialTrainingService _industrialTraining;
         private readonly SamLabelingService _samLabeling;
 
         public InsightApplication(IFrontendMessenger messenger, IUiDispatcher ui, IAppDialogService dialogs)
@@ -23,12 +25,14 @@ namespace Insight.Services
             _ui = ui;
             _dialogs = dialogs;
             _training = new TrainingOrchestrator(_messenger, new YoloTrainingEngine());
+            _industrialTraining = new IndustrialTrainingService(_messenger, new YoloTrainingEngine());
             _samLabeling = new SamLabelingService(_messenger, _ui);
         }
 
         public void Dispose()
         {
             _samLabeling.Dispose();
+            _industrialTraining.Dispose();
             _training.Dispose();
         }
 
@@ -896,6 +900,71 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
         public void HandleStopTraining()
         {
             _training.Stop();
+        }
+
+        public Task HandleCreateDatasetVersionAsync(JsonElement data)
+        {
+            return _industrialTraining.HandleCreateDatasetVersionAsync(data);
+        }
+
+        public void HandleValidateDataset(JsonElement data)
+        {
+            _industrialTraining.HandleValidateDataset(data);
+        }
+
+        public Task HandleStartTrainingRunAsync(JsonElement data)
+        {
+            return _industrialTraining.HandleStartTrainingRunAsync(data);
+        }
+
+        public Task HandleResumeTrainingRunAsync(JsonElement data)
+        {
+            return _industrialTraining.HandleResumeTrainingRunAsync(data);
+        }
+
+        public void HandleStopTrainingRun()
+        {
+            _industrialTraining.HandleStopTrainingRun();
+        }
+
+        public void HandleGetTrainingRuns(JsonElement data)
+        {
+            _industrialTraining.HandleGetTrainingRuns(data);
+        }
+
+        public void HandleGetTrainingRunDetail(JsonElement data)
+        {
+            _industrialTraining.HandleGetTrainingRunDetail(data);
+        }
+
+        public void HandleGetEvaluationReport(JsonElement data)
+        {
+            _industrialTraining.HandleGetEvaluationReport(data);
+        }
+
+        public void HandlePromoteModel(JsonElement data)
+        {
+            _industrialTraining.HandlePromoteModel(data);
+        }
+
+        public void HandleBenchmarkModel(JsonElement data)
+        {
+            _industrialTraining.HandleBenchmarkModel(data);
+        }
+
+        public void HandleRunInferencePreview(JsonElement data)
+        {
+            _industrialTraining.HandleRunInferencePreview(data);
+        }
+
+        public void HandleRunModelEvaluation(JsonElement data)
+        {
+            _industrialTraining.HandleRunModelEvaluation(data);
+        }
+
+        public void HandleExportModelPackage(JsonElement data)
+        {
+            _industrialTraining.HandleExportModelPackage(data);
         }
 
         #region 前端通信辅助方法

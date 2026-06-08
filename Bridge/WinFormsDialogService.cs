@@ -36,10 +36,13 @@ namespace Insight.Bridge
         {
             return _ui.Invoke(() =>
             {
+                var isPreviewImage = string.Equals(type, "industrialPreviewImage", StringComparison.OrdinalIgnoreCase);
                 using var dialog = new OpenFileDialog
                 {
-                    Filter = "Python Executable|python.exe|All Files|*.*",
-                    Title = "选择 Python 解释器"
+                    Filter = isPreviewImage
+                        ? "Image Files|*.jpg;*.jpeg;*.png;*.bmp|All Files|*.*"
+                        : "Python Executable|python.exe|All Files|*.*",
+                    Title = isPreviewImage ? "选择推理预览图片" : "选择 Python 解释器"
                 };
 
                 return dialog.ShowDialog(_owner) == DialogResult.OK ? dialog.FileName : null;

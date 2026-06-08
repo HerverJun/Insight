@@ -95,7 +95,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            letter-spacing: -0.02em;
+            letter-spacing: 0;
         }
 
         .nav-menu {
@@ -338,7 +338,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0;
             position: relative;
             overflow: hidden;
         }
@@ -580,8 +580,119 @@
             color: var(--primary);
             margin-top: 8px;
             font-family: 'Segoe UI', system-ui, sans-serif;
-            letter-spacing: -0.5px;
+            letter-spacing: 0;
             text-shadow: none;
+        }
+
+        .industrial-overview {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .industrial-metric {
+            min-height: 78px;
+            background: #FFFFFF;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .industrial-metric-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-sub);
+        }
+
+        .industrial-metric-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1;
+        }
+
+        .industrial-metric-note {
+            font-size: 12px;
+            color: var(--text-light);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .industrial-layout {
+            display: grid;
+            grid-template-columns: 420px minmax(520px, 1fr) 360px;
+            gap: 24px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .industrial-panel-body {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-width: 72px;
+            justify-content: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid var(--border-color);
+            background: #F8FAFC;
+            color: var(--text-sub);
+        }
+
+        .status-pill.success {
+            background: rgba(16, 185, 129, 0.12);
+            color: #047857;
+            border-color: rgba(16, 185, 129, 0.24);
+        }
+
+        .status-pill.warning {
+            background: rgba(245, 158, 11, 0.12);
+            color: #B45309;
+            border-color: rgba(245, 158, 11, 0.24);
+        }
+
+        .status-pill.error {
+            background: rgba(239, 68, 68, 0.12);
+            color: #B91C1C;
+            border-color: rgba(239, 68, 68, 0.24);
+        }
+
+        .industrial-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .industrial-action-row .btn {
+            font-size: 11px;
+            padding: 5px 8px;
+            min-height: 28px;
+        }
+
+        .industrial-note-box {
+            border: 1px solid var(--border-color);
+            background: #F8FAFC;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 12px;
+            color: var(--text-sub);
+            line-height: 1.6;
         }
 
         .chart-row {
@@ -1193,6 +1304,20 @@
                 </svg>
                 <span>智能标注</span>
             </div>
+            <div class="nav-item" onclick="switchTab('industrial')" id="nav-industrial">
+                <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 21h18"></path>
+                    <path d="M5 21V7l8-4v18"></path>
+                    <path d="M19 21V11l-6-3"></path>
+                    <path d="M9 9h1"></path>
+                    <path d="M9 13h1"></path>
+                    <path d="M9 17h1"></path>
+                    <path d="M15 13h1"></path>
+                    <path d="M15 17h1"></path>
+                </svg>
+                <span>专业训练</span>
+            </div>
             <div class="nav-item" onclick="switchTab('models')" id="nav-models">
                 <!-- Models/Archive Icon -->
                 <svg class="nav-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"
@@ -1595,6 +1720,221 @@
                 <div class="console-log" id="toolConsole" style="background: #1e272e; border-radius: 12px;">
                     <div class="log-item"><span class="log-time">[System]</span>Ready for
                         conversion.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Industrial Trainer -->
+        <div id="view-industrial" class="view-container">
+            <div class="industrial-overview">
+                <div class="industrial-metric">
+                    <div class="industrial-metric-label">数据版本</div>
+                    <div class="industrial-metric-value" id="industrialMetricDatasets">0</div>
+                    <div class="industrial-metric-note" id="industrialMetricDatasetNote">等待创建</div>
+                </div>
+                <div class="industrial-metric">
+                    <div class="industrial-metric-label">实验运行</div>
+                    <div class="industrial-metric-value" id="industrialMetricRuns">0</div>
+                    <div class="industrial-metric-note" id="industrialMetricRunNote">暂无运行</div>
+                </div>
+                <div class="industrial-metric">
+                    <div class="industrial-metric-label">注册模型</div>
+                    <div class="industrial-metric-value" id="industrialMetricModels">0</div>
+                    <div class="industrial-metric-note" id="industrialMetricModelNote">尚未产出模型</div>
+                </div>
+                <div class="industrial-metric">
+                    <div class="industrial-metric-label">交付包</div>
+                    <div class="industrial-metric-value" id="industrialMetricPackages">0</div>
+                    <div class="industrial-metric-note" id="industrialMetricPackageNote">ClearVision / ONNX Runtime</div>
+                </div>
+            </div>
+
+            <div class="industrial-layout">
+                <div class="panel-col">
+                    <div class="card fill-height">
+                        <div class="card-header">
+                            <span>数据版本与 QA</span>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-primary" onclick="createIndustrialDatasetVersion()" style="font-size:12px;padding:6px 10px;">创建版本</button>
+                                <button class="btn btn-secondary" onclick="loadIndustrialWorkspace()" style="font-size:12px;padding:6px 10px;">刷新</button>
+                            </div>
+                        </div>
+                        <div class="params-grid" style="margin-top:12px;">
+                            <div class="form-group">
+                                <label class="form-label">Split Seed</label>
+                                <input id="industrialSplitSeed" type="number" class="form-control" value="42">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Train / Val</label>
+                                <input id="industrialSplitRatio" type="text" class="form-control" value="0.8,0.1">
+                            </div>
+                        </div>
+                        <div id="industrialQaSummary" style="font-size:12px;color:var(--text-sub);padding:10px 0;">选择项目并创建数据版本。</div>
+                        <div class="checklist-container" style="padding:0;background:#fff;">
+                            <table class="training-table">
+                                <thead>
+                                    <tr>
+                                        <th>版本</th>
+                                        <th style="width:70px;">图片</th>
+                                        <th style="width:70px;">问题</th>
+                                        <th style="width:70px;">QA</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="industrialDatasetBody">
+                                    <tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无数据版本</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-col">
+                    <div class="card" style="flex:1;">
+                        <div class="card-header">
+                            <span>实验运行</span>
+                            <div style="display:flex;gap:8px;">
+                                <button class="btn btn-primary" onclick="startIndustrialTraining()" style="font-size:12px;padding:6px 10px;">启动训练</button>
+                                <button class="btn btn-danger" onclick="stopIndustrialTrainingRun()" style="font-size:12px;padding:6px 10px;">停止</button>
+                            </div>
+                        </div>
+                        <div class="params-grid" style="margin-top:12px;">
+                            <div class="form-group">
+                                <label class="form-label">数据版本</label>
+                                <select id="industrialDatasetSelect" class="form-control"></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">实验名</label>
+                                <input id="industrialExperimentName" class="form-control" value="Industrial Detection">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">预设模型</label>
+                                <select id="industrialModelSize" class="form-control">
+                                    <option value="v8s" selected>YOLOv8 Small</option>
+                                    <option value="v8m">YOLOv8 Medium</option>
+                                    <option value="v11s">YOLO11 Small</option>
+                                    <option value="v11m">YOLO11 Medium</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Epochs</label>
+                                <input id="industrialEpochs" type="number" class="form-control" value="100">
+                            </div>
+                        </div>
+                        <div class="checklist-container" style="padding:0;background:#fff;margin-top:10px;">
+                            <table class="training-table">
+                                <thead>
+                                    <tr>
+                                        <th>Run</th>
+                                        <th style="width:110px;">状态</th>
+                                        <th style="width:120px;">mAP50</th>
+                                        <th style="width:220px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="industrialRunBody">
+                                    <tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card" style="flex:1;">
+                        <div class="card-header"><span>模型注册表</span></div>
+                        <div class="checklist-container" style="padding:0;background:#fff;">
+                            <table class="training-table">
+                                <thead>
+                                    <tr>
+                                        <th>模型</th>
+                                        <th style="width:120px;">状态</th>
+                                        <th style="width:90px;">ONNX</th>
+                                        <th style="width:90px;">门禁</th>
+                                        <th style="width:110px;">包</th>
+                                        <th style="width:320px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="industrialModelBody">
+                                    <tr><td colspan="6" style="text-align:center;color:#99a;padding:20px;">暂无注册模型</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-col">
+                    <div class="card">
+                        <div class="card-header"><span>平台交付</span></div>
+                        <div class="form-group">
+                            <label class="form-label">目标平台</label>
+                            <select id="industrialPackageProfile" class="form-control">
+                                <option value="ClearVision" selected>ClearVision</option>
+                                <option value="GenericOnnxRuntime">通用 ONNX Runtime</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">输出目录</label>
+                            <div class="input-group">
+                                <input id="industrialPackageOutputRoot" class="form-control" placeholder="留空则导出到项目 .insight\packages">
+                                <button class="btn btn-secondary" onclick="selectFolder('platformPackageOutput')" title="选择输出目录">...</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">License</label>
+                            <input id="industrialPackageLicense" class="form-control" value="REVIEW_REQUIRED">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">硬件与报告</label>
+                            <input id="industrialPackageHardware" class="form-control" placeholder="CPU/GPU/驱动/相机/产线 profile">
+                        </div>
+                        <div class="form-group">
+                            <input id="industrialPackageReportId" class="form-control" placeholder="报告 ID，空则使用评估报告或 run id">
+                        </div>
+                        <div class="industrial-note-box" id="industrialPackageSummary">
+                            选择一个注册模型后点击导出，会生成 `model.onnx`、`labels.txt`、`model_catalog.json`、ClearVision manifest 和评估证据。
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span>真实推理预览</span></div>
+                        <div class="form-group">
+                            <label class="form-label">预览图片</label>
+                            <div class="input-group">
+                                <input id="industrialPreviewImagePath" class="form-control" placeholder="选择一张现场或验证图片">
+                                <button class="btn btn-secondary" onclick="selectFile('industrialPreviewImage')" title="选择图片">...</button>
+                            </div>
+                        </div>
+                        <div class="params-grid">
+                            <div class="form-group">
+                                <label class="form-label">Conf</label>
+                                <input id="industrialPreviewConf" type="number" step="0.01" min="0" max="1" class="form-control" value="0.25">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">NMS IoU</label>
+                                <input id="industrialPreviewIou" type="number" step="0.01" min="0" max="1" class="form-control" value="0.45">
+                            </div>
+                        </div>
+                        <div class="industrial-note-box" id="industrialPreviewSummary">
+                            选择图片后，在模型注册表点击“预览”即可执行真实 ONNX 推理并生成带框图片。
+                        </div>
+                    </div>
+                    <div class="card fill-height">
+                        <div class="card-header"><span>上线检查</span></div>
+                        <div class="params-grid">
+                            <div class="form-group">
+                                <label class="form-label">评估 Split</label>
+                                <select id="industrialEvalSplit" class="form-control">
+                                    <option value="auto" selected>Auto</option>
+                                    <option value="test">Test</option>
+                                    <option value="val">Val</option>
+                                    <option value="all">All</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">样本上限</label>
+                                <input id="industrialEvalMaxSamples" type="number" class="form-control" value="500">
+                            </div>
+                        </div>
+                        <div class="industrial-note-box">
+                            模型包会记录 SHA-256、类别顺序、CPU fallback、数据版本、硬件 profile 和报告 ID。真实产线签核仍需要现场样本、阈值复核和验收记录。
+                        </div>
+                        <div class="industrial-note-box" id="industrialDetailPanel">
+                            当前没有选中的实验或模型。
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2106,6 +2446,10 @@
                     if (typeof loadTrainingHistory === 'function') loadTrainingHistory();
                 }
 
+                if (viewId === 'industrial') {
+                    if (typeof loadIndustrialWorkspace === 'function') loadIndustrialWorkspace();
+                }
+
                 if (viewId === 'onnx') {
                     const selectOnnx = document.getElementById('onnxProjectSelect');
                     if(selectOnnx && selectOnnx.options.length === 0) {
@@ -2149,6 +2493,7 @@
                 // Update Target Path (Constructed)
                 const workspace = currentProjectConfig.RootPath + "\\dataset";
                 document.getElementById('targetPath').value = workspace;
+                if (typeof initializeIndustrialPackageOutput === 'function') initializeIndustrialPackageOutput();
 
                 // Request Subfolders
                 window.chrome.webview.postMessage(JSON.stringify({
@@ -2367,6 +2712,394 @@
             });
         }
 
+        // ========== Industrial Trainer ==========
+        const DEFAULT_CLEARVISION_PACKAGE_ROOT = '';
+
+        let industrialState = {
+            datasetVersions: [],
+            runs: [],
+            models: [],
+            selectedDatasetVersionId: '',
+            lastPackage: null
+        };
+
+        function getIndustrialProjectRoot() {
+            if (!currentProjectConfig || !currentProjectConfig.RootPath) {
+                showMiniToast('warning', '请选择项目', '请先在任务配置中选择项目', 'warning');
+                return '';
+            }
+            return currentProjectConfig.RootPath;
+        }
+
+        function getIndustrialSourcePaths() {
+            const checked = document.querySelectorAll('#dataSourceList input[type="checkbox"]:checked');
+            if (checked.length > 0 && currentProjectConfig && currentProjectConfig.RootPath) {
+                return Array.from(checked).map(cb => currentProjectConfig.RootPath + "\\" + cb.value);
+            }
+            const target = document.getElementById('targetPath') ? document.getElementById('targetPath').value : '';
+            return target ? [target] : [];
+        }
+
+        function getIndustrialSplitRatios() {
+            const text = (document.getElementById('industrialSplitRatio') || {}).value || '0.8,0.1';
+            const parts = text.split(',').map(x => parseFloat(x.trim()));
+            const trainRatio = Number.isFinite(parts[0]) ? parts[0] : 0.8;
+            const valRatio = Number.isFinite(parts[1]) ? parts[1] : 0.1;
+            return { trainRatio, valRatio, testRatio: Math.max(0, 1 - trainRatio - valRatio) };
+        }
+
+        function createIndustrialDatasetVersion() {
+            const projectRoot = getIndustrialProjectRoot();
+            if (!projectRoot) return;
+            const sourcePaths = getIndustrialSourcePaths();
+            if (!sourcePaths.length) {
+                showMiniToast('warning', '缺少数据源', '请先勾选一个数据源文件夹', 'warning');
+                return;
+            }
+            const split = getIndustrialSplitRatios();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'create_dataset_version',
+                projectRoot: projectRoot,
+                projectName: currentProjectConfig.Name || '',
+                sourcePaths: sourcePaths,
+                classes: currentProjectConfig.Classes || [],
+                splitSeed: parseInt(document.getElementById('industrialSplitSeed').value) || 42,
+                trainRatio: split.trainRatio,
+                valRatio: split.valRatio,
+                testRatio: split.testRatio
+            }));
+        }
+
+        function validateSelectedDataset() {
+            const projectRoot = getIndustrialProjectRoot();
+            const datasetVersionId = document.getElementById('industrialDatasetSelect').value;
+            if (!projectRoot || !datasetVersionId) return;
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'validate_dataset',
+                projectRoot,
+                datasetVersionId
+            }));
+        }
+
+        function loadIndustrialWorkspace() {
+            const projectRoot = getIndustrialProjectRoot();
+            if (!projectRoot) return;
+            initializeIndustrialPackageOutput();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_training_runs',
+                projectRoot
+            }));
+        }
+
+        function startIndustrialTraining() {
+            const projectRoot = getIndustrialProjectRoot();
+            const datasetVersionId = document.getElementById('industrialDatasetSelect').value;
+            if (!projectRoot || !datasetVersionId) {
+                showMiniToast('warning', '缺少数据版本', '请先创建并选择数据版本', 'warning');
+                return;
+            }
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'start_training_run',
+                projectRoot,
+                datasetVersionId,
+                experimentName: document.getElementById('industrialExperimentName').value || 'Industrial Detection',
+                pythonPath: document.getElementById('pythonPath').value || 'python',
+                modelSize: document.getElementById('industrialModelSize').value || 'v8s',
+                imgSize: parseInt(document.getElementById('imgSize').value) || 640,
+                epochs: parseInt(document.getElementById('industrialEpochs').value) || 100,
+                batchSize: parseInt(document.getElementById('batchSize').value) || 16,
+                patience: parseInt(document.getElementById('patience').value) || 50,
+                workers: parseInt(document.getElementById('workers').value) || 8,
+                gpuIndex: document.getElementById('gpuIndex').value || '0',
+                advancedOptions: {
+                    cache: 'False',
+                    amp: 'True'
+                }
+            }));
+        }
+
+        function stopIndustrialTrainingRun() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'stop_training_run'
+            }));
+        }
+
+        function resumeIndustrialRun(runId) {
+            const projectRoot = getIndustrialProjectRoot();
+            const run = industrialState.runs.find(x => x.Id === runId || x.id === runId);
+            const datasetVersionId = run ? (run.DatasetVersionId || run.datasetVersionId) : document.getElementById('industrialDatasetSelect').value;
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'resume_training_run',
+                projectRoot,
+                datasetVersionId,
+                resumeRunId: runId,
+                pythonPath: document.getElementById('pythonPath').value || 'python',
+                modelSize: document.getElementById('industrialModelSize').value || 'v8s',
+                epochs: parseInt(document.getElementById('industrialEpochs').value) || 100,
+                imgSize: parseInt(document.getElementById('imgSize').value) || 640,
+                batchSize: parseInt(document.getElementById('batchSize').value) || 16,
+                patience: parseInt(document.getElementById('patience').value) || 50,
+                workers: parseInt(document.getElementById('workers').value) || 8,
+                gpuIndex: document.getElementById('gpuIndex').value || '0'
+            }));
+        }
+
+        function loadIndustrialEvaluation(runId) {
+            const projectRoot = getIndustrialProjectRoot();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_evaluation_report',
+                projectRoot,
+                runId
+            }));
+        }
+
+        function loadIndustrialRunDetail(runId) {
+            const projectRoot = getIndustrialProjectRoot();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'get_training_run_detail',
+                projectRoot,
+                runId
+            }));
+        }
+
+        function promoteIndustrialModel(modelId, status) {
+            const projectRoot = getIndustrialProjectRoot();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'promote_model',
+                projectRoot,
+                modelId,
+                status
+            }));
+        }
+
+        function benchmarkIndustrialModel(modelId) {
+            const projectRoot = getIndustrialProjectRoot();
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'benchmark_model',
+                projectRoot,
+                modelId
+            }));
+        }
+
+        function previewIndustrialModel(modelId) {
+            const projectRoot = getIndustrialProjectRoot();
+            const imagePath = document.getElementById('industrialPreviewImagePath').value || '';
+            if (!imagePath) {
+                showMiniToast('warning', '缺少预览图片', '请先在右侧选择一张图片', 'warning');
+                return;
+            }
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'run_inference_preview',
+                projectRoot,
+                modelId,
+                imagePath,
+                confidenceThreshold: parseFloat(document.getElementById('industrialPreviewConf').value) || 0.25,
+                nmsIouThreshold: parseFloat(document.getElementById('industrialPreviewIou').value) || 0.45
+            }));
+        }
+
+        function runIndustrialModelEvaluation(modelId) {
+            const projectRoot = getIndustrialProjectRoot();
+            if (!projectRoot || !modelId) return;
+            const datasetVersionId = document.getElementById('industrialDatasetSelect').value || '';
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'run_model_evaluation',
+                projectRoot,
+                modelId,
+                datasetVersionId,
+                split: document.getElementById('industrialEvalSplit').value || 'auto',
+                iouThreshold: 0.5,
+                nmsIouThreshold: parseFloat(document.getElementById('industrialPreviewIou').value) || 0.45,
+                maxSamples: parseInt(document.getElementById('industrialEvalMaxSamples').value) || 500,
+                maxGallerySamples: 80,
+                confidenceThresholds: [0.1, 0.2, 0.25, 0.35, 0.5, 0.65, 0.8]
+            }));
+        }
+
+        function initializeIndustrialPackageOutput() {
+            const el = document.getElementById('industrialPackageOutputRoot');
+            if (!el) return;
+            const saved = localStorage.getItem('insight_platform_package_output');
+            if (saved && !el.dataset.userTouched) {
+                el.value = saved;
+            }
+            if (!el.value) {
+                el.value = DEFAULT_CLEARVISION_PACKAGE_ROOT;
+            }
+        }
+
+        function exportIndustrialModelPackage(modelId) {
+            const projectRoot = getIndustrialProjectRoot();
+            if (!projectRoot || !modelId) return;
+            initializeIndustrialPackageOutput();
+            const outputRoot = document.getElementById('industrialPackageOutputRoot').value || DEFAULT_CLEARVISION_PACKAGE_ROOT;
+            localStorage.setItem('insight_platform_package_output', outputRoot);
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'export_model_package',
+                projectRoot,
+                modelId,
+                profile: document.getElementById('industrialPackageProfile').value || 'ClearVision',
+                outputRoot,
+                license: document.getElementById('industrialPackageLicense').value || 'REVIEW_REQUIRED',
+                hardwareProfile: document.getElementById('industrialPackageHardware').value || '',
+                reportId: document.getElementById('industrialPackageReportId').value || ''
+            }));
+        }
+
+        function openIndustrialPackage(path) {
+            if (!path) return;
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'open_output',
+                path
+            }));
+        }
+
+        function renderIndustrialWorkspace(payload) {
+            industrialState.datasetVersions = payload.datasetVersions || [];
+            industrialState.runs = payload.runs || [];
+            industrialState.models = payload.models || [];
+            renderIndustrialDatasets();
+            renderIndustrialRuns();
+            renderIndustrialModels();
+            renderIndustrialOverview();
+        }
+
+        function renderIndustrialDatasets() {
+            const body = document.getElementById('industrialDatasetBody');
+            const select = document.getElementById('industrialDatasetSelect');
+            if (!body || !select) return;
+            body.innerHTML = '';
+            select.innerHTML = '';
+            if (!industrialState.datasetVersions.length) {
+                body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无数据版本</td></tr>';
+                return;
+            }
+            industrialState.datasetVersions.forEach(v => {
+                const id = v.Id || v.id;
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = `${id} (${v.ImageCount || v.imageCount || 0})`;
+                select.appendChild(option);
+                const issueCount = v.IssueCount || v.issueCount || 0;
+                const tr = document.createElement('tr');
+                tr.onclick = () => { select.value = id; validateSelectedDataset(); };
+                tr.innerHTML = `<td>${escapeHtml(id)}</td><td>${v.ImageCount || v.imageCount || 0}</td><td>${issueCount}</td><td><span class="status-pill ${issueCount ? 'warning' : 'success'}">${issueCount ? 'Review' : 'OK'}</span></td>`;
+                body.appendChild(tr);
+            });
+            if (industrialState.selectedDatasetVersionId) select.value = industrialState.selectedDatasetVersionId;
+        }
+
+        function renderIndustrialRuns() {
+            const body = document.getElementById('industrialRunBody');
+            if (!body) return;
+            body.innerHTML = '';
+            if (!industrialState.runs.length) {
+                body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>';
+                return;
+            }
+            industrialState.runs.forEach(r => {
+                const id = r.Id || r.id;
+                const status = r.Status || r.status || '';
+                const metrics = r.Metrics || r.metrics || [];
+                const lastMap = [...metrics].reverse().find(x => x.Map50 || x.map50);
+                const mapText = lastMap ? Number(lastMap.Map50 || lastMap.map50 || 0).toFixed(3) : '-';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(id)}</td><td>${renderIndustrialStatus(status)}</td><td>${mapText}</td><td>
+                    <div class="industrial-action-row">
+                    <button class="btn btn-secondary" onclick="loadIndustrialRunDetail('${id}')">详情</button>
+                    <button class="btn btn-secondary" onclick="loadIndustrialEvaluation('${id}')">评估</button>
+                    <button class="btn btn-secondary" onclick="resumeIndustrialRun('${id}')">续训</button>
+                    </div>
+                </td>`;
+                body.appendChild(tr);
+            });
+        }
+
+        function renderIndustrialModels() {
+            const body = document.getElementById('industrialModelBody');
+            if (!body) return;
+            body.innerHTML = '';
+            if (!industrialState.models.length) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#99a;padding:20px;">暂无注册模型</td></tr>';
+                return;
+            }
+            industrialState.models.forEach(m => {
+                const id = m.Id || m.id;
+                const status = m.Status || m.status || '';
+                const smoke = m.SmokeTest || m.smokeTest || {};
+                const packagePath = m.LastPackagePath || m.lastPackagePath || '';
+                const readiness = m.LastReadinessStatus || m.lastReadinessStatus || 'Review';
+                const packagePathArg = escapeJsArg(packagePath);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(id)}</td><td>${renderIndustrialStatus(status)}${m.IsPinned || m.isPinned ? '<div style="font-size:11px;color:var(--success);margin-top:4px;">Production pinned</div>' : ''}</td><td>${smoke.Success || smoke.success ? '<span class="status-pill success">OK</span>' : '<span class="status-pill warning">待测</span>'}</td><td>${renderReadinessStatus(readiness)}</td><td>${packagePath ? '<span class="status-pill success">已导出</span>' : '<span class="status-pill">未导出</span>'}</td><td>
+                    <div class="industrial-action-row">
+                    <button class="btn btn-secondary" onclick="benchmarkIndustrialModel('${id}')">Benchmark</button>
+                    <button class="btn btn-secondary" onclick="previewIndustrialModel('${id}')">预览</button>
+                    <button class="btn btn-secondary" onclick="runIndustrialModelEvaluation('${id}')">验收</button>
+                    <button class="btn btn-primary" onclick="promoteIndustrialModel('${id}','Production')">生产</button>
+                    <button class="btn btn-secondary" onclick="exportIndustrialModelPackage('${id}')">导出</button>
+                    ${packagePath ? `<button class="btn btn-secondary" onclick="openIndustrialPackage('${packagePathArg}')">打开</button>` : ''}
+                    </div>
+                </td>`;
+                body.appendChild(tr);
+            });
+        }
+
+        function renderIndustrialOverview() {
+            const datasetCount = industrialState.datasetVersions.length;
+            const runCount = industrialState.runs.length;
+            const modelCount = industrialState.models.length;
+            const packageCount = industrialState.models.filter(m => m.LastPackagePath || m.lastPackagePath).length;
+            setText('industrialMetricDatasets', datasetCount);
+            setText('industrialMetricRuns', runCount);
+            setText('industrialMetricModels', modelCount);
+            setText('industrialMetricPackages', packageCount);
+
+            const latestDataset = industrialState.datasetVersions[0];
+            const latestRun = industrialState.runs[0];
+            const pinned = industrialState.models.find(m => m.IsPinned || m.isPinned);
+            setText('industrialMetricDatasetNote', latestDataset ? `${latestDataset.ImageCount || latestDataset.imageCount || 0} images / ${latestDataset.IssueCount || latestDataset.issueCount || 0} issues` : '等待创建');
+            setText('industrialMetricRunNote', latestRun ? `${latestRun.Id || latestRun.id || ''} / ${latestRun.Status || latestRun.status || ''}` : '暂无运行');
+            setText('industrialMetricModelNote', pinned ? `Production: ${pinned.Id || pinned.id}` : '尚未钉选生产模型');
+            setText('industrialMetricPackageNote', industrialState.lastPackage ? industrialState.lastPackage.PackageRoot || industrialState.lastPackage.packageRoot || '已导出' : 'ClearVision / ONNX Runtime');
+        }
+
+        function renderIndustrialStatus(status) {
+            const text = status || '-';
+            const lower = text.toLowerCase();
+            let cls = '';
+            if (lower.includes('completed') || lower.includes('production') || lower.includes('candidate')) cls = 'success';
+            else if (lower.includes('failed') || lower.includes('archived')) cls = 'error';
+            else if (lower.includes('running') || lower.includes('preparing') || lower.includes('exporting') || lower.includes('evaluating') || lower.includes('stopped')) cls = 'warning';
+            return `<span class="status-pill ${cls}">${escapeHtml(text)}</span>`;
+        }
+
+        function renderReadinessStatus(status) {
+            const text = status || 'Review';
+            const lower = text.toLowerCase();
+            const cls = lower === 'pass' ? 'success' : lower === 'fail' ? 'error' : 'warning';
+            return `<span class="status-pill ${cls}">${escapeHtml(text)}</span>`;
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        function escapeJsArg(value) {
+            return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        function renderIndustrialQa(report) {
+            const el = document.getElementById('industrialQaSummary');
+            if (!el || !report) return;
+            const issueCount = report.IssueCount || report.issueCount || 0;
+            const imageCount = report.ImageCount || report.imageCount || 0;
+            const labelCount = report.LabelCount || report.labelCount || 0;
+            const recommendation = report.Recommendation || report.recommendation || '';
+            el.textContent = `QA: 图片 ${imageCount}，标签 ${labelCount}，问题 ${issueCount}。${recommendation}`;
+        }
+
         // ========== WebView2 Bridge ==========
         window.chrome.webview.addEventListener('message', event => {
             const data = JSON.parse(event.data); // Make sure backend sends stringified JSON or object
@@ -2456,6 +3189,110 @@
                 }
             }
 
+            else if (data.action === 'dataset_version_created') {
+                industrialState.selectedDatasetVersionId = (data.version && (data.version.Id || data.version.id)) || '';
+                renderIndustrialQa(data.report);
+                showMiniToast('success', '数据版本已创建', industrialState.selectedDatasetVersionId, 'success');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'dataset_validation_completed') {
+                renderIndustrialQa(data.report);
+                showMiniToast('success', 'QA 已完成', '数据集校验报告已刷新', 'success');
+            }
+
+            else if (data.action === 'training_runs_loaded') {
+                renderIndustrialWorkspace(data);
+            }
+
+            else if (data.action === 'training_run_detail_loaded') {
+                const run = data.run || {};
+                const status = run.Status || run.status || '';
+                showMiniToast('success', '实验详情', `${run.Id || run.id || ''} / ${status}`, 'success');
+            }
+
+            else if (data.action === 'evaluation_report_loaded') {
+                const report = data.report || {};
+                const map50 = report.Map50 || report.map50 || 0;
+                showMiniToast('success', '评估报告', `mAP50 ${Number(map50).toFixed(3)}`, 'success');
+            }
+
+            else if (data.action === 'industrial_training_started') {
+                showMiniToast('success', '专业训练已启动', (data.run && (data.run.Id || data.run.id)) || '', 'success');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'industrial_training_data') {
+                const metric = data.metric || {};
+                updateChart(metric.Epoch || metric.epoch, metric.BoxLoss || metric.boxLoss, metric.Map50 || metric.map50, metric.Map5095 || metric.map5095);
+            }
+
+            else if (data.action === 'industrial_training_finished') {
+                showMiniToast(data.success ? 'success' : 'error', data.success ? '专业训练完成' : '专业训练失败', (data.run && ((data.run.FailureReason || data.run.failureReason) || data.run.Id || data.run.id)) || '', data.success ? 'success' : 'error');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'model_registered') {
+                showMiniToast('success', '模型已注册', (data.model && (data.model.Id || data.model.id)) || '', 'success');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'model_promoted') {
+                showMiniToast('success', '模型状态已更新', (data.model && (data.model.Status || data.model.status)) || '', 'success');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'benchmark_completed') {
+                const bench = data.benchmark || {};
+                showMiniToast(bench.Success || bench.success ? 'success' : 'warning', 'Benchmark 完成', bench.Message || bench.message || '', bench.Success || bench.success ? 'success' : 'warning');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'inference_preview_completed') {
+                const smoke = data.smoke || {};
+                const preview = data.preview || {};
+                const detectionCount = (preview.Detections || preview.detections || []).length;
+                const annotatedPath = preview.AnnotatedImagePath || preview.annotatedImagePath || '';
+                const summary = document.getElementById('industrialPreviewSummary');
+                if (summary) {
+                    summary.innerHTML = annotatedPath
+                        ? `检测 ${detectionCount} 个目标，耗时 ${preview.TotalMs || preview.totalMs || '-'} ms。<br>${escapeHtml(annotatedPath)}`
+                        : (smoke.Message || smoke.message || 'ONNX smoke 已完成');
+                }
+                const detail = document.getElementById('industrialDetailPanel');
+                if (detail && annotatedPath) {
+                    detail.innerHTML = `最近预览: ${detectionCount} 个目标。<br>标注图: ${escapeHtml(annotatedPath)}<br>报告: ${escapeHtml(preview.ReportPath || preview.reportPath || '')}`;
+                }
+                showMiniToast(data.ready ? 'success' : 'warning', '推理预览', annotatedPath ? `检测 ${detectionCount} 个目标` : (smoke.Message || smoke.message || ''), data.ready ? 'success' : 'warning');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'model_package_exported') {
+                industrialState.lastPackage = data.package || null;
+                const packageRoot = industrialState.lastPackage ? (industrialState.lastPackage.PackageRoot || industrialState.lastPackage.packageRoot || '') : '';
+                const summary = document.getElementById('industrialPackageSummary');
+                if (summary) summary.textContent = packageRoot ? `平台模型包已生成: ${packageRoot}` : '平台模型包已生成。';
+                const detail = document.getElementById('industrialDetailPanel');
+                if (detail) detail.textContent = packageRoot ? `可交付给 ClearVision 的模型目录、manifest、labels 与报告已经写入: ${packageRoot}` : '模型包已完成。';
+                showMiniToast('success', '平台包已导出', packageRoot || '模型包已生成', 'success');
+                loadIndustrialWorkspace();
+            }
+
+            else if (data.action === 'model_evaluation_completed') {
+                const report = data.report || {};
+                const metrics = report.Metrics || report.metrics || {};
+                const status = report.ReadinessStatus || report.readinessStatus || 'Review';
+                const best = report.BestConfidenceThreshold || report.bestConfidenceThreshold || '-';
+                const path = report.ReportPath || report.reportPath || '';
+                const gallery = report.ErrorGalleryPath || report.errorGalleryPath || '';
+                const detail = document.getElementById('industrialDetailPanel');
+                if (detail) {
+                    detail.innerHTML = `门禁: ${renderReadinessStatus(status)}<br>Precision: ${Number(metrics.Precision || metrics.precision || 0).toFixed(3)} / Recall: ${Number(metrics.Recall || metrics.recall || 0).toFixed(3)} / F1: ${Number(metrics.F1 || metrics.f1 || 0).toFixed(3)}<br>推荐阈值: ${best}<br>报告: ${escapeHtml(path)}<br>样本墙: ${escapeHtml(gallery)}`;
+                }
+                showMiniToast(status === 'Pass' ? 'success' : (status === 'Fail' ? 'error' : 'warning'), '验收评估完成', `F1 ${Number(metrics.F1 || metrics.f1 || 0).toFixed(3)} / ${status}`, status === 'Pass' ? 'success' : 'warning');
+                loadIndustrialWorkspace();
+            }
+
             else if (data.action === 'folder_selected') {
                 if (data.type === 'python') {
                     document.getElementById('pythonPath').value = data.path;
@@ -2467,6 +3304,17 @@
                 else if (data.type === 'newOnnxProjectRoot') document.getElementById('newOnnxProjectRoot').value = data.path;
                 else if (data.type === 'toolSource') document.getElementById('toolSourcePath').value = data.path;
                 else if (data.type === 'toolTarget') document.getElementById('toolTargetPath').value = data.path;
+                else if (data.type === 'industrialPreviewImage') {
+                    document.getElementById('industrialPreviewImagePath').value = data.path;
+                }
+                else if (data.type === 'platformPackageOutput') {
+                    const el = document.getElementById('industrialPackageOutputRoot');
+                    if (el) {
+                        el.value = data.path;
+                        el.dataset.userTouched = 'true';
+                    }
+                    localStorage.setItem('insight_platform_package_output', data.path);
+                }
                 else if (data.type === 'modelStorage') {
                     document.getElementById('modelStoragePath').value = data.path;
                     localStorage.setItem('insight_model_storage_path', data.path);
@@ -4395,6 +5243,7 @@
         setTimeout(() => {
             loadProjects();
             loadPythonPath();
+            if (typeof initializeIndustrialPackageOutput === 'function') initializeIndustrialPackageOutput();
         }, 500); // Trigger auto load
     </script>
 </body>

@@ -9,6 +9,19 @@ namespace Insight.Bridge
             Generate,
             StartTraining,
             StopTraining,
+            CreateDatasetVersion,
+            ValidateDataset,
+            StartTrainingRun,
+            ResumeTrainingRun,
+            StopTrainingRun,
+            GetTrainingRuns,
+            GetTrainingRunDetail,
+            GetEvaluationReport,
+            PromoteModel,
+            BenchmarkModel,
+            RunInferencePreview,
+            RunModelEvaluation,
+            ExportModelPackage,
             ExportDatasetZip,
             StartKaggleTraining,
             DownloadKaggleOutput,
@@ -45,6 +58,19 @@ namespace Insight.Bridge
         public const string Generate = "generate";
         public const string StartTraining = "start_training";
         public const string StopTraining = "stop_training";
+        public const string CreateDatasetVersion = "create_dataset_version";
+        public const string ValidateDataset = "validate_dataset";
+        public const string StartTrainingRun = "start_training_run";
+        public const string ResumeTrainingRun = "resume_training_run";
+        public const string StopTrainingRun = "stop_training_run";
+        public const string GetTrainingRuns = "get_training_runs";
+        public const string GetTrainingRunDetail = "get_training_run_detail";
+        public const string GetEvaluationReport = "get_evaluation_report";
+        public const string PromoteModel = "promote_model";
+        public const string BenchmarkModel = "benchmark_model";
+        public const string RunInferencePreview = "run_inference_preview";
+        public const string RunModelEvaluation = "run_model_evaluation";
+        public const string ExportModelPackage = "export_model_package";
         public const string ExportDatasetZip = "export_dataset_zip";
         public const string StartKaggleTraining = "start_kaggle_training";
         public const string DownloadKaggleOutput = "download_kaggle_output";
