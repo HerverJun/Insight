@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Insight.Bridge;
 using Insight.Infrastructure.Processes;
+using Insight.Services.Cloud.Kaggle;
 using Insight.Services.Industrial;
 using Insight.Training;
 using Insight.Training.Jobs;
@@ -158,6 +159,99 @@ public class IndustrialTrainingServiceTests
             Assert.True(File.Exists(run.OnnxPath));
             Assert.Contains(jobStore.Records, x => x.JobId == run.Id && x.ProviderId == LocalYoloTrainingProvider.ProviderId && x.State == TrainingProviderJobState.Running);
             Assert.Contains(jobStore.Records, x => x.JobId == run.Id && x.State == TrainingProviderJobState.Completed);
+        }
+        finally
+        {
+            DeleteTempDirectory(projectRoot);
+        }
+    }
+
+    [Fact]
+    public async Task StartTrainingRunCanUseKaggleProviderAndRegisterDownloadedArtifacts()
+    {
+        var projectRoot = CreateTempDirectory();
+        try
+        {
+            var insightRoot = Path.Combine(projectRoot, ".insight");
+            Directory.CreateDirectory(insightRoot);
+            var yoloRoot = Path.Combine(insightRoot, "datasets", "ds_cloud", "yolo");
+            Directory.CreateDirectory(Path.Combine(yoloRoot, "images", "train"));
+            Directory.CreateDirectory(Path.Combine(yoloRoot, "labels", "train"));
+            var dataYaml = Path.Combine(yoloRoot, "data.yaml");
+            File.WriteAllText(dataYaml, "train: images/train\nnames:\n  0: scratch\n", Encoding.UTF8);
+
+            var index = new IndustrialStoreIndex
+            {
+                DatasetVersions = new List<DatasetVersion>
+                {
+                    new()
+                    {
+                        Id = "ds_cloud",
+                        ProjectRoot = projectRoot,
+                        ProjectName = "Surface QA",
+                        YoloRoot = yoloRoot,
+                        DataYamlPath = dataYaml,
+                        Classes = new List<string> { "scratch" }
+                    }
+                }
+            };
+            File.WriteAllText(Path.Combine(insightRoot, "industrial_index.json"), JsonSerializer.Serialize(index, JsonOptions), Encoding.UTF8);
+
+            var runner = new IndustrialFakeProcessRunner();
+            var jobStore = new RecordingTrainingJobStore();
+            var kaggleClient = new IndustrialFakeKaggleClient();
+            var service = new IndustrialTrainingService(
+                new RecordingFrontendMessenger(),
+                new YoloTrainingEngine(),
+                runner,
+                jobStore,
+                new ITrainingProvider[]
+                {
+                    new LocalYoloTrainingProvider(new YoloTrainingEngine(), runner),
+                    new KaggleYoloTrainingProvider(kaggleClient)
+                });
+
+            var run = await service.StartTrainingRunAsync(new TrainingRunConfig
+            {
+                ProjectRoot = projectRoot,
+                DatasetVersionId = "ds_cloud",
+                ProviderId = KaggleYoloTrainingProvider.ProviderId,
+                ExperimentName = "Cloud Boundary Test",
+                PythonPath = "python",
+                ModelSize = "v8s",
+                Epochs = 1,
+                BatchSize = 1,
+                ImgSize = 64,
+                Workers = 0,
+                ProviderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["kaggleUsername"] = "tester",
+                    ["datasetSlug"] = "surface-ds",
+                    ["kernelSlug"] = "surface-kernel",
+                    ["pollIntervalSeconds"] = "0",
+                    ["pollTimeoutMinutes"] = "1"
+                }
+            });
+
+            Assert.Equal("Completed", run.Status);
+            Assert.Equal(KaggleYoloTrainingProvider.ProviderId, run.ProviderId);
+            Assert.Equal("tester/surface-kernel", run.ProviderExternalJobId);
+            Assert.Empty(runner.Specs);
+            Assert.True(File.Exists(run.BestPtPath));
+            Assert.True(File.Exists(run.OnnxPath));
+            Assert.Contains(jobStore.Records, x =>
+                x.JobId == run.Id &&
+                x.ProviderId == KaggleYoloTrainingProvider.ProviderId &&
+                x.State == TrainingProviderJobState.Completed &&
+                x.ExternalJobId == "tester/surface-kernel");
+
+            var persisted = JsonSerializer.Deserialize<IndustrialStoreIndex>(
+                File.ReadAllText(Path.Combine(insightRoot, "industrial_index.json"), Encoding.UTF8),
+                JsonOptions)!;
+            var model = Assert.Single(persisted.ModelRegistry);
+            Assert.Equal(run.Id, model.RunId);
+            Assert.True(File.Exists(model.PtPath));
+            Assert.True(File.Exists(model.OnnxPath));
         }
         finally
         {
@@ -499,6 +593,68 @@ public class IndustrialTrainingServiceTests
             }
 
             return Task.FromResult(new ProcessRunResult(0, cancellationToken.IsCancellationRequested, "ok"));
+        }
+    }
+
+    private sealed class IndustrialFakeKaggleClient : IKaggleClient
+    {
+        public Task<KaggleConnectionTestResult> TestConnectionAsync(
+            KaggleConnectionTestRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleConnectionTestResult { Success = true, Message = "ok" });
+        }
+
+        public Task<KaggleTrainingSubmissionResult> SubmitTrainingAsync(
+            KaggleTrainingSubmissionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingSubmissionResult());
+        }
+
+        public Task<KaggleTrainingSubmissionResult> SubmitPreparedTrainingAsync(
+            KagglePreparedTrainingSubmissionRequest request,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal("ds_cloud", request.DatasetVersionId);
+            Assert.True(Directory.Exists(request.DatasetDirectory));
+            return Task.FromResult(new KaggleTrainingSubmissionResult
+            {
+                JobId = request.JobId,
+                DatasetId = $"{request.KaggleUsername}/{request.DatasetSlug}",
+                KernelId = $"{request.KaggleUsername}/{request.KernelSlug}",
+                KernelUrl = $"https://www.kaggle.com/code/{request.KaggleUsername}/{request.KernelSlug}",
+                Submitted = true
+            });
+        }
+
+        public Task<KaggleTrainingJobStatus> GetTrainingStatusAsync(
+            string kernelId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingJobStatus
+            {
+                KernelId = kernelId,
+                State = "Completed",
+                Message = "complete"
+            });
+        }
+
+        public Task<string> DownloadOutputAsync(
+            KaggleOutputDownloadRequest request,
+            CancellationToken cancellationToken)
+        {
+            var output = request.OutputDirectory;
+            Directory.CreateDirectory(Path.Combine(output, "InsightYOLO", "runs", "train", "weights"));
+            var weights = Path.Combine(output, "InsightYOLO", "runs", "train", "weights");
+            File.WriteAllText(Path.Combine(weights, "best.pt"), "best", Encoding.UTF8);
+            File.WriteAllText(Path.Combine(weights, "last.pt"), "last", Encoding.UTF8);
+            File.WriteAllBytes(Path.Combine(output, "detector.onnx"), new byte[] { 1, 2, 3, 4 });
+            File.WriteAllText(
+                Path.Combine(output, "results.csv"),
+                "epoch,train/box_loss,metrics/mAP50(B),metrics/mAP50-95(B)\n1,1.1,0.91,0.77\n",
+                Encoding.UTF8);
+            return Task.FromResult(output);
         }
     }
 

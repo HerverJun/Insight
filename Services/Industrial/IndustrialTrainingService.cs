@@ -32,6 +32,7 @@ namespace Insight.Services.Industrial
         private readonly ITrainingEngine _metricParser;
         private readonly IProcessRunner _processRunner;
         private readonly ITrainingJobStore _jobStore;
+        private readonly TrainingProviderCatalog _providers;
         private readonly object _processLock = new();
         private CancellationTokenSource? _activeRunCts;
         private string _activeRunId = "";
@@ -51,11 +52,26 @@ namespace Insight.Services.Industrial
             ITrainingEngine? metricParser,
             IProcessRunner processRunner,
             ITrainingJobStore jobStore)
+            : this(messenger, metricParser, processRunner, jobStore, null)
+        {
+        }
+
+        public IndustrialTrainingService(
+            IFrontendMessenger messenger,
+            ITrainingEngine? metricParser,
+            IProcessRunner processRunner,
+            ITrainingJobStore jobStore,
+            IEnumerable<ITrainingProvider>? providers)
         {
             _messenger = messenger;
             _metricParser = metricParser ?? new YoloTrainingEngine();
             _processRunner = processRunner;
             _jobStore = jobStore;
+            _providers = new TrainingProviderCatalog(
+                providers ?? new ITrainingProvider[]
+                {
+                    new LocalYoloTrainingProvider(_metricParser, _processRunner)
+                });
         }
 
         public void Dispose()
@@ -853,6 +869,7 @@ namespace Insight.Services.Industrial
                     ExperimentName = config.ExperimentName,
                     Status = "Preparing",
                     RunRoot = runRoot,
+                    ProviderId = config.ProviderId,
                     ConfigPath = Path.Combine(runRoot, "config.json"),
                     EnvironmentPath = Path.Combine(runRoot, "environment.json"),
                     LogPath = Path.Combine(runRoot, "train.log"),
@@ -969,7 +986,8 @@ namespace Insight.Services.Industrial
                 return;
             }
 
-            if (!IsValidPython(run.Config.PythonPath))
+            var provider = _providers.GetRequired(run.ProviderId);
+            if (provider.Descriptor.Kind == TrainingProviderKind.LocalProcess && !IsValidPython(run.Config.PythonPath))
             {
                 FailRun(run, $"Python 路径无效: {run.Config.PythonPath}");
                 return;
@@ -977,31 +995,34 @@ namespace Insight.Services.Industrial
 
             var arguments = BuildYoloTrainArguments(run.Config, dataset, run.RunRoot);
             File.WriteAllText(Path.Combine(run.RunRoot, "train_command.txt"), arguments + Environment.NewLine, Encoding.UTF8);
+            var providerOptions = BuildProviderOptions(run, dataset, provider);
+            if (provider.Descriptor.Kind == TrainingProviderKind.LocalProcess)
+            {
+                providerOptions["arguments"] = arguments;
+            }
             AppendLog(run, "训练命令: " + arguments);
 
             try
             {
-                var result = await _processRunner.RunAsync(
-                    new ProcessStartSpec
+                var providerResult = await provider.StartAsync(
+                    new TrainingProviderJobRequest
                     {
-                        FileName = run.Config.PythonPath,
-                        Arguments = arguments,
-                        WorkingDirectory = run.RunRoot,
-                        StandardOutputEncoding = Encoding.UTF8,
-                        StandardErrorEncoding = Encoding.UTF8,
-                        EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                        {
-                            ["PYTHONIOENCODING"] = "utf-8",
-                            ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-                        }
+                        JobId = run.Id,
+                        ProjectRoot = run.ProjectRoot,
+                        DatasetVersionId = run.DatasetVersionId,
+                        PythonPath = run.Config.PythonPath,
+                        WorkDir = run.RunRoot,
+                        Params = BuildTrainingParams(run.Config, dataset),
+                        ProviderOptions = providerOptions
                     },
-                    line => HandleTrainingOutput(run, line),
+                    new IndustrialTrainingJobObserver(this, run),
                     cancellationToken);
 
                 var wasStopped = false;
                 lock (_processLock)
                 {
-                    wasStopped = result.WasCanceled || (_stopRequested && _activeRunId == run.Id);
+                    wasStopped = providerResult.State == TrainingProviderJobState.Stopped ||
+                        (_stopRequested && _activeRunId == run.Id);
                 }
 
                 if (wasStopped)
@@ -1010,9 +1031,27 @@ namespace Insight.Services.Industrial
                     return;
                 }
 
-                if (!result.Succeeded)
+                run.ProviderMetadata = providerResult.Metadata;
+                if (providerResult.Metadata.TryGetValue("kernelId", out var kernelId))
                 {
-                    var exitCode = result.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown";
+                    run.ProviderExternalJobId = kernelId;
+                }
+                else
+                {
+                    run.ProviderExternalJobId = providerResult.JobId;
+                }
+
+                ApplyProviderArtifacts(run, providerResult.Artifacts);
+                if (string.IsNullOrWhiteSpace(run.BestPtPath))
+                {
+                    run.BestPtPath = providerResult.ArtifactPath;
+                }
+
+                if (providerResult.State == TrainingProviderJobState.Failed)
+                {
+                    var exitCode = string.IsNullOrWhiteSpace(providerResult.FailureReason)
+                        ? (providerResult.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown")
+                        : providerResult.FailureReason;
                     FailRun(run, $"训练进程退出码: {exitCode}。请检查 Python 环境、ultralytics 安装、GPU device 和数据路径。");
                     return;
                 }
@@ -1038,8 +1077,20 @@ namespace Insight.Services.Industrial
             CancellationToken cancellationToken)
         {
             LoadMetricsFromResultsCsv(run);
-            run.BestPtPath = FindArtifact(run.RunRoot, "best.pt");
-            run.LastPtPath = FindArtifact(run.RunRoot, "last.pt");
+            if (string.IsNullOrWhiteSpace(run.BestPtPath))
+            {
+                run.BestPtPath = FindArtifact(run.RunRoot, "best.pt");
+            }
+
+            if (string.IsNullOrWhiteSpace(run.LastPtPath))
+            {
+                run.LastPtPath = FindArtifact(run.RunRoot, "last.pt");
+            }
+
+            if (string.IsNullOrWhiteSpace(run.OnnxPath))
+            {
+                run.OnnxPath = FindArtifact(run.RunRoot, "*.onnx");
+            }
 
             if (string.IsNullOrWhiteSpace(run.BestPtPath))
             {
@@ -1057,7 +1108,14 @@ namespace Insight.Services.Industrial
             run.Status = "Exporting";
             UpsertRun(run.ProjectRoot, run);
             TrySyncTrainingJob(run);
-            run.OnnxPath = await ExportOnnxAsync(run, cancellationToken);
+            if (string.IsNullOrWhiteSpace(run.OnnxPath))
+            {
+                run.OnnxPath = await ExportOnnxAsync(run, cancellationToken);
+            }
+            else
+            {
+                AppendLog(run, "Using provider-supplied ONNX artifact: " + run.OnnxPath);
+            }
 
             if (!string.IsNullOrWhiteSpace(run.OnnxPath))
             {
@@ -1074,6 +1132,7 @@ namespace Insight.Services.Industrial
             UpsertRun(run.ProjectRoot, run);
             TrySyncTrainingJob(run);
             _messenger.Send(new { action = "industrial_training_finished", success = true, run });
+            ClearActiveRun(run.Id);
             _messenger.Log($"专业训练完成: {run.Id}", "success");
         }
 
@@ -1185,11 +1244,11 @@ namespace Insight.Services.Industrial
                 var record = new TrainingJobRecord
                 {
                     JobId = run.Id,
-                    ProviderId = LocalYoloTrainingProvider.ProviderId,
+                    ProviderId = string.IsNullOrWhiteSpace(run.ProviderId) ? LocalYoloTrainingProvider.ProviderId : run.ProviderId,
                     State = MapTrainingRunState(run.Status),
                     ProjectRoot = run.ProjectRoot,
                     DatasetVersionId = run.DatasetVersionId,
-                    ExternalJobId = run.Id,
+                    ExternalJobId = string.IsNullOrWhiteSpace(run.ProviderExternalJobId) ? run.Id : run.ProviderExternalJobId,
                     ArtifactRoot = string.IsNullOrWhiteSpace(run.OnnxPath) ? run.RunRoot : run.OnnxPath,
                     FailureReason = run.FailureReason,
                     Metadata =
@@ -1199,6 +1258,11 @@ namespace Insight.Services.Industrial
                         ["status"] = run.Status
                     }
                 };
+
+                foreach (var pair in run.ProviderMetadata)
+                {
+                    record.Metadata[pair.Key] = pair.Value;
+                }
 
                 _jobStore.UpsertAsync(record, CancellationToken.None).GetAwaiter().GetResult();
             }
@@ -1279,6 +1343,149 @@ namespace Insight.Services.Industrial
             AppendJsonLine(run.MetricsPath, metric);
             UpsertRun(run.ProjectRoot, run);
             _messenger.Send(new { action = "industrial_training_data", runId = run.Id, metric });
+        }
+
+        private Dictionary<string, string> BuildProviderOptions(
+            TrainingRunRecord run,
+            DatasetVersion dataset,
+            ITrainingProvider provider)
+        {
+            var options = new Dictionary<string, string>(run.Config.ProviderOptions, StringComparer.OrdinalIgnoreCase)
+            {
+                ["projectName"] = string.IsNullOrWhiteSpace(dataset.ProjectName)
+                    ? run.ExperimentName
+                    : dataset.ProjectName,
+                ["datasetVersionId"] = dataset.Id,
+                ["datasetDirectory"] = dataset.YoloRoot,
+                ["runRoot"] = run.RunRoot,
+                ["outputDirectory"] = Path.Combine(run.RunRoot, "kaggle_output")
+            };
+
+            if (provider.Descriptor.Id == KaggleYoloTrainingProvider.ProviderId)
+            {
+                options.TryAdd("datasetSlug", MakeSafeSlug($"{Path.GetFileName(run.ProjectRoot)}-{dataset.Id}"));
+                options.TryAdd("kernelSlug", MakeSafeSlug($"{Path.GetFileName(run.ProjectRoot)}-{run.Id}"));
+                options.TryAdd("yoloVersion", ResolveKaggleYoloVersion(run.Config.ModelSize));
+            }
+
+            return options;
+        }
+
+        private static TrainingParams BuildTrainingParams(TrainingRunConfig config, DatasetVersion dataset)
+        {
+            return new TrainingParams
+            {
+                ModelSize = config.ModelSize,
+                ImgSize = config.ImgSize,
+                Epochs = config.Epochs,
+                BatchSize = config.BatchSize,
+                Patience = config.Patience,
+                Workers = config.Workers,
+                GpuIndex = config.GpuIndex,
+                Classes = dataset.Classes
+            };
+        }
+
+        private static void ApplyProviderArtifacts(TrainingRunRecord run, IReadOnlyList<TrainingArtifact> artifacts)
+        {
+            foreach (var artifact in artifacts)
+            {
+                if (string.IsNullOrWhiteSpace(artifact.Path)) continue;
+
+                if (artifact.Format.Equals("pt", StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetFileName(artifact.Path).Equals("best.pt", StringComparison.OrdinalIgnoreCase))
+                {
+                    run.BestPtPath = artifact.Path;
+                }
+                else if (artifact.Format.Equals("pt-last", StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetFileName(artifact.Path).Equals("last.pt", StringComparison.OrdinalIgnoreCase))
+                {
+                    run.LastPtPath = artifact.Path;
+                }
+                else if (artifact.Format.Equals("onnx", StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetExtension(artifact.Path).Equals(".onnx", StringComparison.OrdinalIgnoreCase))
+                {
+                    run.OnnxPath = artifact.Path;
+                }
+            }
+        }
+
+        private static string ResolveKaggleYoloVersion(string modelSize)
+        {
+            var value = (modelSize ?? "").Trim().ToLowerInvariant();
+            if (value.StartsWith("v11", StringComparison.OrdinalIgnoreCase)) return "yolo11";
+            if (value.StartsWith("v26", StringComparison.OrdinalIgnoreCase)) return "yolo26";
+            return "yolov8";
+        }
+
+        private static string MakeSafeSlug(string value)
+        {
+            var chars = value
+                .Trim()
+                .ToLowerInvariant()
+                .Select(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' ? ch : '-')
+                .ToArray();
+            var slug = new string(chars);
+            while (slug.Contains("--", StringComparison.Ordinal))
+            {
+                slug = slug.Replace("--", "-", StringComparison.Ordinal);
+            }
+
+            slug = slug.Trim('-');
+            return string.IsNullOrWhiteSpace(slug) ? "insight-yolo" : slug;
+        }
+
+        private static string NormalizeProviderId(string providerId)
+        {
+            var value = (providerId ?? "").Trim().ToLowerInvariant();
+            return value switch
+            {
+                "" or "local" or "local-yolo" => LocalYoloTrainingProvider.ProviderId,
+                "kaggle" or "kaggle-yolo" or "cloud" => KaggleYoloTrainingProvider.ProviderId,
+                _ => value
+            };
+        }
+
+        private sealed class IndustrialTrainingJobObserver : ITrainingJobObserver
+        {
+            private readonly IndustrialTrainingService _service;
+            private readonly TrainingRunRecord _run;
+
+            public IndustrialTrainingJobObserver(IndustrialTrainingService service, TrainingRunRecord run)
+            {
+                _service = service;
+                _run = run;
+            }
+
+            public void Log(string message, string type = "info")
+            {
+                _service.AppendLog(_run, message);
+                _service._messenger.Log(message, type);
+            }
+
+            public void Metric(TrainingMetricUpdate update)
+            {
+                var metric = new MetricPoint
+                {
+                    Epoch = update.Epoch,
+                    BoxLoss = update.BoxLoss,
+                    Map50 = update.Map50,
+                    Map5095 = update.Map5095,
+                    Progress = update.Progress
+                };
+                _run.Metrics.Add(metric);
+                AppendJsonLine(_run.MetricsPath, metric);
+                _service.UpsertRun(_run.ProjectRoot, _run);
+                _service._messenger.Send(new { action = "industrial_training_data", runId = _run.Id, metric });
+            }
+
+            public void Artifact(TrainingArtifact artifact)
+            {
+                ApplyProviderArtifacts(_run, new[] { artifact });
+                _service.UpsertRun(_run.ProjectRoot, _run);
+                _service.TrySyncTrainingJob(_run);
+                _service._messenger.Send(new { action = "industrial_training_artifact", runId = _run.Id, artifact });
+            }
         }
 
         private DatasetManifestItem MaterializeSample(
@@ -2639,6 +2846,7 @@ namespace Insight.Services.Industrial
             {
                 ProjectRoot = GetRequiredString(data, "projectRoot"),
                 DatasetVersionId = GetRequiredString(data, "datasetVersionId"),
+                ProviderId = GetOptionalString(data, "providerId"),
                 ExperimentName = GetOptionalString(data, "experimentName"),
                 PythonPath = GetOptionalString(data, "pythonPath"),
                 ModelSize = GetOptionalString(data, "modelSize"),
@@ -2658,6 +2866,23 @@ namespace Insight.Services.Industrial
                 foreach (var prop in advanced.EnumerateObject())
                 {
                     config.AdvancedOptions[prop.Name] = prop.Value.ToString();
+                }
+            }
+
+            if (data.TryGetProperty("providerOptions", out var providerOptions) && providerOptions.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in providerOptions.EnumerateObject())
+                {
+                    config.ProviderOptions[prop.Name] = prop.Value.ToString();
+                }
+            }
+
+            foreach (var name in new[] { "kaggleUsername", "datasetSlug", "kernelSlug", "pollIntervalSeconds", "pollTimeoutMinutes" })
+            {
+                var value = GetOptionalString(data, name);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    config.ProviderOptions[name] = value;
                 }
             }
 
@@ -2715,6 +2940,7 @@ namespace Insight.Services.Industrial
         private static void NormalizeTrainingConfig(TrainingRunConfig config)
         {
             config.ProjectRoot = Path.GetFullPath(config.ProjectRoot);
+            config.ProviderId = NormalizeProviderId(config.ProviderId);
             if (string.IsNullOrWhiteSpace(config.DatasetVersionId)) throw new InvalidOperationException("缺少数据版本。");
             if (string.IsNullOrWhiteSpace(config.ExperimentName)) config.ExperimentName = "Industrial Detection";
             if (string.IsNullOrWhiteSpace(config.PythonPath)) config.PythonPath = "python";

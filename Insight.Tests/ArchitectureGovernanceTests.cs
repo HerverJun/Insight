@@ -2,6 +2,7 @@ using System.Text.Json;
 using Insight.Bridge;
 using Insight.Infrastructure.Processes;
 using Insight.Infrastructure.Training;
+using Insight.Services.Cloud.Kaggle;
 using Insight.Services.Configuration;
 using Insight.Training;
 using Insight.Training.Jobs;
@@ -154,6 +155,60 @@ public class ArchitectureGovernanceTests
     }
 
     [Fact]
+    public async Task KaggleYoloProviderPollsDownloadsAndReturnsProviderArtifacts()
+    {
+        var workDir = CreateTempDirectory();
+        try
+        {
+            var datasetDir = Path.Combine(workDir, "dataset");
+            Directory.CreateDirectory(datasetDir);
+            var outputDir = Path.Combine(workDir, "output");
+            var client = new FakeKaggleClient(outputDir);
+            var observer = new RecordingTrainingObserver();
+            var provider = new KaggleYoloTrainingProvider(client);
+
+            var result = await provider.StartAsync(
+                new TrainingProviderJobRequest
+                {
+                    JobId = "run_cloud",
+                    ProjectRoot = workDir,
+                    DatasetVersionId = "ds_1",
+                    WorkDir = workDir,
+                    Params = new TrainingParams
+                    {
+                        ModelSize = "v8s",
+                        Epochs = 1,
+                        BatchSize = 1,
+                        Classes = new List<string> { "scratch" }
+                    },
+                    ProviderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["projectName"] = "Surface QA",
+                        ["kaggleUsername"] = "tester",
+                        ["datasetSlug"] = "surface-ds",
+                        ["kernelSlug"] = "surface-kernel",
+                        ["datasetDirectory"] = datasetDir,
+                        ["outputDirectory"] = outputDir,
+                        ["pollIntervalSeconds"] = "0",
+                        ["pollTimeoutMinutes"] = "1"
+                    }
+                },
+                observer,
+                CancellationToken.None);
+
+            Assert.Equal(TrainingProviderJobState.Completed, result.State);
+            Assert.Equal("tester/surface-kernel", result.Metadata["kernelId"]);
+            Assert.Contains(result.Artifacts, x => x.Format == "pt" && Path.GetFileName(x.Path) == "best.pt");
+            Assert.Contains(result.Artifacts, x => x.Format == "onnx" && Path.GetExtension(x.Path) == ".onnx");
+            Assert.Contains(observer.Logs, x => x.Contains("Kaggle kernel status"));
+        }
+        finally
+        {
+            DeleteTempDirectory(workDir);
+        }
+    }
+
+    [Fact]
     public void TrainingProviderCatalogRejectsDuplicateProviderIds()
     {
         var first = new StaticTrainingProvider("local-yolo");
@@ -296,6 +351,67 @@ public class ArchitectureGovernanceTests
                 JobId = request.JobId,
                 State = TrainingProviderJobState.Completed
             });
+        }
+    }
+
+    private sealed class FakeKaggleClient : IKaggleClient
+    {
+        private readonly string _outputDir;
+
+        public FakeKaggleClient(string outputDir)
+        {
+            _outputDir = outputDir;
+        }
+
+        public Task<KaggleConnectionTestResult> TestConnectionAsync(
+            KaggleConnectionTestRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleConnectionTestResult { Success = true, Message = "ok" });
+        }
+
+        public Task<KaggleTrainingSubmissionResult> SubmitTrainingAsync(
+            KaggleTrainingSubmissionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingSubmissionResult());
+        }
+
+        public Task<KaggleTrainingSubmissionResult> SubmitPreparedTrainingAsync(
+            KagglePreparedTrainingSubmissionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingSubmissionResult
+            {
+                JobId = request.JobId,
+                DatasetId = $"{request.KaggleUsername}/{request.DatasetSlug}",
+                KernelId = $"{request.KaggleUsername}/{request.KernelSlug}",
+                KernelUrl = $"https://www.kaggle.com/code/{request.KaggleUsername}/{request.KernelSlug}",
+                Submitted = true
+            });
+        }
+
+        public Task<KaggleTrainingJobStatus> GetTrainingStatusAsync(
+            string kernelId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingJobStatus
+            {
+                KernelId = kernelId,
+                State = "Completed",
+                Message = "complete"
+            });
+        }
+
+        public Task<string> DownloadOutputAsync(
+            KaggleOutputDownloadRequest request,
+            CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(Path.Combine(_outputDir, "weights"));
+            File.WriteAllText(Path.Combine(_outputDir, "weights", "best.pt"), "best");
+            File.WriteAllBytes(Path.Combine(_outputDir, "detector.onnx"), new byte[] { 1, 2, 3, 4 });
+            File.WriteAllText(Path.Combine(_outputDir, "results.csv"), "epoch,metrics/mAP50(B)\n1,0.9\n");
+            return Task.FromResult(_outputDir);
         }
     }
 }

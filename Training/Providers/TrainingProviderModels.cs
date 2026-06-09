@@ -48,6 +48,8 @@ namespace Insight.Training.Providers
         public TrainingProviderJobState State { get; init; }
         public int? ExitCode { get; init; }
         public string ArtifactPath { get; init; } = "";
+        public List<TrainingArtifact> Artifacts { get; init; } = new();
         public string FailureReason { get; init; } = "";
+        public Dictionary<string, string> Metadata { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

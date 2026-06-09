@@ -5,7 +5,7 @@ Branch: `codex/refactor-prep`
 
 ## Governance Goal
 
-InsightV4 should evolve from a feature-heavy desktop tool into a training platform shell with stable extension points. Local YOLO training, SAM labeling, ONNX validation, deployment package export, and future Kaggle API training must plug into the same application boundaries instead of growing inside WebView handlers or monolithic services.
+InsightV4 should evolve from a feature-heavy desktop tool into a training platform shell with stable extension points. Local YOLO training, Kaggle cloud YOLO training, SAM labeling, ONNX validation, and deployment package export must plug into the same application boundaries instead of growing inside WebView handlers or monolithic services.
 
 ## Target Layers
 
@@ -27,7 +27,7 @@ InsightV4 should evolve from a feature-heavy desktop tool into a training platfo
 
 5. Training Providers
    - `local-yolo`: local Python/Ultralytics provider.
-   - `kaggle-api`: future cloud provider for Kaggle kernels, datasets, artifacts, and job polling.
+   - `kaggle-yolo`: Kaggle CLI-backed cloud provider for prepared dataset versions, notebooks, status polling, output downloads, and artifact return.
 
 ## First-Round Boundaries
 
@@ -49,10 +49,12 @@ Required provider responsibilities:
 - Stream logs and metric updates to an observer.
 - Return final job state, exit code, failure reason, and primary artifact path if available.
 
-Planned providers:
+Current providers:
 
 - `local-yolo`: uses `ITrainingEngine` plus `IProcessRunner`.
-- `kaggle-api`: will use `IKaggleClient`, `ISecretsStore`, and artifact download/polling adapters.
+- `kaggle-yolo`: uses `IKaggleClient` to test credentials, stage the selected `.insight` dataset version, create/version a Kaggle Dataset, push a Kaggle Notebook kernel, poll status, download output, and return `best.pt`, ONNX, metrics/report artifacts to the industrial training run.
+
+Provider outputs flow back through `IndustrialTrainingService`. The service remains responsible for run/job state, evaluation report generation, model registry entries, ONNX smoke testing, and delivery package export.
 
 ## Storage Policy
 
@@ -68,9 +70,10 @@ Required before merging architecture changes:
 
 ```powershell
 dotnet restore Insight.sln
-dotnet build Insight.sln --no-restore
+dotnet build Insight.sln -c Debug --no-restore
 dotnet build Insight.sln -c Release --no-restore
-dotnet test Insight.sln --no-build --verbosity minimal
+dotnet test Insight.sln -c Debug --no-build --verbosity minimal
+dotnet test Insight.sln -c Release --no-build --verbosity minimal
 ```
 
 `dotnet format Insight.sln --verify-no-changes` remains a desired gate, but the current workstation cannot run it because the format tool cannot locate MSBuild even though `dotnet msbuild` works.
@@ -84,9 +87,21 @@ dotnet test Insight.sln --no-build --verbosity minimal
 - `WebViewPayloadBinder` and typed payload DTOs now protect high-risk settings, model, and Kaggle command paths while preserving existing frontend action names.
 - Regression coverage includes protocol action parity, typed payload validation, process runner behavior, Kaggle CLI boundary behavior, provider catalog rules, job store persistence, industrial training process/job synchronization, and model conversion runner invocation.
 
+## Kaggle Provider v1
+
+`kaggle-yolo` is selected from the professional training workflow with `providerId = "kaggle-yolo"` and provider options:
+
+- `kaggleUsername`: Kaggle account name used for dataset and kernel ids.
+- `datasetSlug`: target Kaggle Dataset slug. Existing datasets are versioned when create fails.
+- `kernelSlug`: target Kaggle Notebook slug. `kaggle kernels push` creates or updates the notebook.
+- `pollIntervalSeconds` and `pollTimeoutMinutes`: status polling controls.
+
+The provider stages the existing dataset version directory rather than re-splitting raw sources. `KaggleCliClient.SubmitPreparedTrainingAsync` copies the selected `DatasetVersion.YoloRoot`, rewrites Kaggle-safe `data.yaml`, writes `training_config.json`, uploads the dataset with `--dir-mode zip`, writes kernel metadata with dataset attachment, pushes `YOLO_TRAIN_KaggleDataset.ipynb`, and returns dataset/kernel ids. After the kernel reaches a terminal state, provider output is downloaded into the run root, artifacts are discovered recursively, and the existing completion path registers the model and keeps evaluation/package flows unchanged.
+
 ## Remaining Governance Backlog
 
 - Continue migrating dataset, project, SAM, and industrial-training WebView payload parsing from raw `JsonElement` to typed DTOs.
 - Split large application services by use case once the provider boundary is stable enough to avoid churn.
-- Replace placeholder secrets/artifact abstractions with concrete implementations before adding Kaggle API-token based flows.
-- Add a real `kaggle-api` provider after the API client, secrets store, artifact store, and polling lifecycle are concrete.
+- Replace placeholder secrets/artifact abstractions with concrete implementations before moving from Kaggle CLI credentials to direct Kaggle API-token based flows.
+- Add optional remote cancel/delete support when a Kaggle API adapter is available; v1 maps local cancellation to stopped run state but does not terminate an already-running Kaggle kernel remotely.
+- Add richer cloud progress parsing from Kaggle logs/results beyond coarse kernel state polling.

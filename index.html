@@ -1802,6 +1802,13 @@
                                 <select id="industrialDatasetSelect" class="form-control"></select>
                             </div>
                             <div class="form-group">
+                                <label class="form-label">Training Provider</label>
+                                <select id="industrialProvider" class="form-control" onchange="toggleIndustrialProviderOptions()">
+                                    <option value="local-yolo" selected>Local YOLO</option>
+                                    <option value="kaggle-yolo">Kaggle Cloud</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">实验名</label>
                                 <input id="industrialExperimentName" class="form-control" value="Industrial Detection">
                             </div>
@@ -1817,6 +1824,24 @@
                             <div class="form-group">
                                 <label class="form-label">Epochs</label>
                                 <input id="industrialEpochs" type="number" class="form-control" value="100">
+                            </div>
+                        </div>
+                        <div id="industrialKaggleOptions" class="params-grid" style="margin-top:10px;display:none;">
+                            <div class="form-group">
+                                <label class="form-label">Kaggle Username</label>
+                                <input id="industrialKaggleUsername" class="form-control" placeholder="kaggle user">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Dataset Slug</label>
+                                <input id="industrialKaggleDatasetSlug" class="form-control" placeholder="surface-dataset">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Kernel Slug</label>
+                                <input id="industrialKaggleKernelSlug" class="form-control" placeholder="surface-training">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Kaggle</label>
+                                <button class="btn btn-secondary" onclick="testIndustrialKaggleConnection()" style="width:100%;">Test Connection</button>
                             </div>
                         </div>
                         <div class="checklist-container" style="padding:0;background:#fff;margin-top:10px;">
@@ -2785,9 +2810,45 @@
             const projectRoot = getIndustrialProjectRoot();
             if (!projectRoot) return;
             initializeIndustrialPackageOutput();
+            initializeIndustrialKaggleDefaults();
+            toggleIndustrialProviderOptions();
             window.chrome.webview.postMessage(JSON.stringify({
                 action: 'get_training_runs',
                 projectRoot
+            }));
+        }
+
+        function toggleIndustrialProviderOptions() {
+            const provider = document.getElementById('industrialProvider')?.value || 'local-yolo';
+            const panel = document.getElementById('industrialKaggleOptions');
+            if (panel) panel.style.display = provider === 'kaggle-yolo' ? 'grid' : 'none';
+        }
+
+        function initializeIndustrialKaggleDefaults() {
+            const projectName = (currentProjectConfig && currentProjectConfig.Name) ? currentProjectConfig.Name : 'insight-yolo';
+            const baseSlug = normalizeKaggleSlug(projectName || 'insight-yolo');
+            const dataset = document.getElementById('industrialKaggleDatasetSlug');
+            const kernel = document.getElementById('industrialKaggleKernelSlug');
+            if (dataset && !dataset.value) dataset.value = `${baseSlug}-dataset`;
+            if (kernel && !kernel.value) kernel.value = `${baseSlug}-training`;
+        }
+
+        function getIndustrialProviderOptions() {
+            const providerId = document.getElementById('industrialProvider')?.value || 'local-yolo';
+            if (providerId !== 'kaggle-yolo') return {};
+            return {
+                kaggleUsername: (document.getElementById('industrialKaggleUsername')?.value || '').trim(),
+                datasetSlug: normalizeKaggleSlug(document.getElementById('industrialKaggleDatasetSlug')?.value || ''),
+                kernelSlug: normalizeKaggleSlug(document.getElementById('industrialKaggleKernelSlug')?.value || ''),
+                pollIntervalSeconds: '30',
+                pollTimeoutMinutes: '480'
+            };
+        }
+
+        function testIndustrialKaggleConnection() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'test_kaggle_connection',
+                kaggleUsername: (document.getElementById('industrialKaggleUsername')?.value || '').trim()
             }));
         }
 
@@ -2798,10 +2859,18 @@
                 showMiniToast('warning', '缺少数据版本', '请先创建并选择数据版本', 'warning');
                 return;
             }
+            const providerId = document.getElementById('industrialProvider')?.value || 'local-yolo';
+            const providerOptions = getIndustrialProviderOptions();
+            if (providerId === 'kaggle-yolo' && !providerOptions.kaggleUsername) {
+                showMiniToast('warning', '缺少 Kaggle 用户名', '请填写 Kaggle Username', 'warning');
+                return;
+            }
             window.chrome.webview.postMessage(JSON.stringify({
                 action: 'start_training_run',
                 projectRoot,
                 datasetVersionId,
+                providerId,
+                providerOptions,
                 experimentName: document.getElementById('industrialExperimentName').value || 'Industrial Detection',
                 pythonPath: document.getElementById('pythonPath').value || 'python',
                 modelSize: document.getElementById('industrialModelSize').value || 'v8s',
@@ -3150,6 +3219,11 @@
 
             else if (data.action === 'kaggle_progress') {
                 updateProgress(data.progress || 0, data.status || 'Kaggle 云训练提交中...');
+            }
+
+            else if (data.action === 'kaggle_connection_tested') {
+                showMiniToast(data.success ? 'success' : 'error', data.success ? 'Kaggle 可用' : 'Kaggle 不可用', data.message || '', data.success ? 'success' : 'error');
+                addLog(data.message || (data.success ? 'Kaggle connection OK' : 'Kaggle connection failed'), data.success ? 'success' : 'error');
             }
 
             else if (data.action === 'kaggle_training_started') {

@@ -10,6 +10,7 @@ using Insight.Services.Configuration;
 using Insight.Services.Industrial;
 using Insight.Services.Training;
 using Insight.Training;
+using Insight.Training.Providers;
 using OpenCvSharp;
 
 namespace Insight.Services
@@ -67,7 +68,12 @@ namespace Insight.Services
                 _messenger,
                 new YoloTrainingEngine(),
                 _processRunner,
-                new FileTrainingJobStore(_paths));
+                new FileTrainingJobStore(_paths),
+                new ITrainingProvider[]
+                {
+                    new LocalYoloTrainingProvider(new YoloTrainingEngine(), _processRunner),
+                    new KaggleYoloTrainingProvider(_kaggleClient)
+                });
             _samLabeling = new SamLabelingService(_messenger, _ui);
         }
 
@@ -538,6 +544,40 @@ namespace Insight.Services
             {
                 SendError($"Kaggle 云训练参数解析失败: {ex.Message}");
                 SendToFrontend(new { action = "kaggle_training_failed" });
+            }
+        }
+
+        public async Task HandleTestKaggleConnectionAsync(
+            TestKaggleConnectionPayload payload,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _kaggleClient.TestConnectionAsync(
+                    new KaggleConnectionTestRequest
+                    {
+                        Username = payload.KaggleUsername,
+                        OnLog = (msg, type) => SendLog(msg, type)
+                    },
+                    cancellationToken);
+
+                SendToFrontend(new
+                {
+                    action = "kaggle_connection_tested",
+                    success = result.Success,
+                    cliVersion = result.CliVersion,
+                    message = result.Message
+                });
+
+                if (!result.Success)
+                {
+                    SendError($"Kaggle connection test failed: {result.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "kaggle_connection_tested", success = false, message = ex.Message });
+                SendError($"Kaggle connection test failed: {ex.Message}");
             }
         }
 

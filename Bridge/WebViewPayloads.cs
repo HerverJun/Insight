@@ -111,6 +111,15 @@ namespace Insight.Bridge
         }
     }
 
+    public sealed class TestKaggleConnectionPayload : IWebViewPayload
+    {
+        public string KaggleUsername { get; set; } = "";
+
+        public void Validate()
+        {
+        }
+    }
+
     public sealed class DirectoryPathPayload : IWebViewPayload
     {
         public string Path { get; set; } = "";

@@ -7,6 +7,8 @@ namespace Insight.Handlers
     {
         public CloudTrainingCommandHandler(InsightApplication app)
         {
+            Map(WebViewActions.TestKaggleConnection, (request, ct) =>
+                app.HandleTestKaggleConnectionAsync(WebViewPayloadBinder.Bind<TestKaggleConnectionPayload>(request.Payload), ct));
             Map(WebViewActions.StartKaggleTraining, (request, ct) =>
                 app.HandleStartKaggleTrainingAsync(WebViewPayloadBinder.Bind<StartKaggleTrainingPayload>(request.Payload)));
             Map(WebViewActions.DownloadKaggleOutput, (request, ct) =>

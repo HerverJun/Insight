@@ -94,6 +94,7 @@ namespace Insight.Services.Industrial
     {
         public string ProjectRoot { get; set; } = "";
         public string DatasetVersionId { get; set; } = "";
+        public string ProviderId { get; set; } = "local-yolo";
         public string ExperimentName { get; set; } = "Industrial Detection";
         public string PythonPath { get; set; } = "python";
         public string ModelSize { get; set; } = "v8s";
@@ -107,6 +108,7 @@ namespace Insight.Services.Industrial
         public string ResumeRunId { get; set; } = "";
         public int Seed { get; set; } = 42;
         public Dictionary<string, string> AdvancedOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> ProviderOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     public sealed class TrainingRunRecord
@@ -120,6 +122,9 @@ namespace Insight.Services.Industrial
         public DateTime? StartedAt { get; set; }
         public DateTime? FinishedAt { get; set; }
         public string RunRoot { get; set; } = "";
+        public string ProviderId { get; set; } = "local-yolo";
+        public string ProviderExternalJobId { get; set; } = "";
+        public Dictionary<string, string> ProviderMetadata { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string ConfigPath { get; set; } = "";
         public string EnvironmentPath { get; set; } = "";
         public string LogPath { get; set; } = "";

@@ -144,11 +144,25 @@ public class ModelCommandGovernanceTests
 
     private sealed class NoopKaggleClient : IKaggleClient
     {
+        public Task<KaggleConnectionTestResult> TestConnectionAsync(
+            KaggleConnectionTestRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleConnectionTestResult { Success = true });
+        }
+
         public Task<KaggleTrainingSubmissionResult> SubmitTrainingAsync(
             KaggleTrainingSubmissionRequest request,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(new KaggleTrainingSubmissionResult());
+        }
+
+        public Task<KaggleTrainingSubmissionResult> SubmitPreparedTrainingAsync(
+            KagglePreparedTrainingSubmissionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new KaggleTrainingSubmissionResult { JobId = request.JobId });
         }
 
         public Task<KaggleTrainingJobStatus> GetTrainingStatusAsync(

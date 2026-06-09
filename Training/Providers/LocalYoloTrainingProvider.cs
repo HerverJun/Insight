@@ -34,12 +34,7 @@ namespace Insight.Training.Providers
             ITrainingJobObserver observer,
             CancellationToken cancellationToken)
         {
-            var launchPlan = _engine.BuildLaunchPlan(new TrainingRequest
-            {
-                PythonPath = request.PythonPath,
-                WorkDir = request.WorkDir,
-                Params = request.Params
-            });
+            var launchPlan = CreateLaunchPlan(request);
 
             observer.Log($"Starting provider {Descriptor.Id}", "info");
             var startedAt = DateTime.Now;
@@ -76,6 +71,10 @@ namespace Insight.Training.Providers
                 observer.Artifact(new TrainingArtifact { Path = artifact, Format = "pt" });
             }
 
+            var artifacts = string.IsNullOrWhiteSpace(artifact)
+                ? new List<TrainingArtifact>()
+                : new List<TrainingArtifact> { new() { Path = artifact, Format = "pt" } };
+
             return new TrainingProviderJobResult
             {
                 JobId = request.JobId,
@@ -84,8 +83,32 @@ namespace Insight.Training.Providers
                     : TrainingProviderJobState.Completed,
                 ExitCode = result.ExitCode,
                 ArtifactPath = artifact,
+                Artifacts = artifacts,
                 FailureReason = string.IsNullOrWhiteSpace(artifact) ? "Training completed but best.pt was not found." : ""
             };
+        }
+
+        private TrainingLaunchPlan CreateLaunchPlan(TrainingProviderJobRequest request)
+        {
+            if (request.ProviderOptions.TryGetValue("arguments", out var arguments) &&
+                !string.IsNullOrWhiteSpace(arguments))
+            {
+                return new TrainingLaunchPlan
+                {
+                    PythonPath = string.IsNullOrWhiteSpace(request.PythonPath) ? "python" : request.PythonPath,
+                    Arguments = arguments,
+                    WorkingDirectory = string.IsNullOrWhiteSpace(request.WorkDir)
+                        ? AppDomain.CurrentDomain.BaseDirectory
+                        : request.WorkDir
+                };
+            }
+
+            return _engine.BuildLaunchPlan(new TrainingRequest
+            {
+                PythonPath = request.PythonPath,
+                WorkDir = request.WorkDir,
+                Params = request.Params
+            });
         }
 
         private static ProcessStartSpec CreateSpec(TrainingLaunchPlan launchPlan)

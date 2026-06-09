@@ -8,6 +8,84 @@ namespace Insight.Tests;
 public class KaggleClientTests
 {
     [Fact]
+    public async Task TestConnectionRunsVersionAndAuthenticatedDatasetList()
+    {
+        var tempRoot = CreateTempDirectory();
+        try
+        {
+            var paths = new InsightAppPaths(
+                Path.Combine(tempRoot, "user"),
+                Path.Combine(tempRoot, "local"));
+            var runner = new RecordingProcessRunner("kaggle 1.7.4");
+            var client = new KaggleCliClient(runner, paths);
+
+            var result = await client.TestConnectionAsync(
+                new KaggleConnectionTestRequest { Username = "tester" },
+                CancellationToken.None);
+
+            Assert.True(result.Success);
+            Assert.Equal(2, runner.Specs.Count);
+            Assert.Equal(new[] { "--version" }, runner.Specs[0].ArgumentList);
+            Assert.Equal(new[] { "datasets", "list", "-s", "tester", "-p", "1" }, runner.Specs[1].ArgumentList);
+        }
+        finally
+        {
+            DeleteTempDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task SubmitPreparedTrainingStagesDatasetAndPushesKernel()
+    {
+        var tempRoot = CreateTempDirectory();
+        try
+        {
+            var dataset = Path.Combine(tempRoot, "dataset-version", "yolo");
+            Directory.CreateDirectory(Path.Combine(dataset, "images", "train"));
+            Directory.CreateDirectory(Path.Combine(dataset, "labels", "train"));
+            File.WriteAllText(Path.Combine(dataset, "data.yaml"), $"path: {dataset}\ntrain: images/train\n", System.Text.Encoding.UTF8);
+
+            var paths = new InsightAppPaths(
+                Path.Combine(tempRoot, "user"),
+                Path.Combine(tempRoot, "local"));
+            var runner = new RecordingProcessRunner("ok");
+            var client = new KaggleCliClient(runner, paths);
+
+            var result = await client.SubmitPreparedTrainingAsync(
+                new KagglePreparedTrainingSubmissionRequest
+                {
+                    JobId = "run_1",
+                    DatasetVersionId = "ds_1",
+                    DatasetDirectory = dataset,
+                    ProjectName = "Surface QA",
+                    KaggleUsername = "Test User",
+                    DatasetSlug = "Surface DS",
+                    KernelSlug = "Surface Kernel",
+                    ModelSize = "v11s",
+                    Classes = new[] { "scratch" }
+                },
+                CancellationToken.None);
+
+            Assert.True(result.Submitted);
+            Assert.Equal("test-user/surface-ds", result.DatasetId);
+            Assert.Equal("test-user/surface-kernel", result.KernelId);
+            Assert.Equal(3, runner.Specs.Count);
+            Assert.Equal(new[] { "datasets", "create", "-p", result.DatasetDirectory, "--dir-mode", "zip", "-q" }, runner.Specs[0].ArgumentList);
+            Assert.Equal(new[] { "kernels", "push", "-p", result.KernelDirectory }, runner.Specs[1].ArgumentList);
+            Assert.Equal(new[] { "kernels", "status", result.KernelId }, runner.Specs[2].ArgumentList);
+
+            var stagedYaml = File.ReadAllText(Path.Combine(result.DatasetDirectory, "data.yaml"), System.Text.Encoding.UTF8);
+            Assert.DoesNotContain(tempRoot.Replace("\\", "/"), stagedYaml);
+            Assert.Contains("train: images/train", stagedYaml);
+            Assert.True(File.Exists(Path.Combine(result.KernelDirectory, "kernel-metadata.json")));
+        }
+        finally
+        {
+            DeleteTempDirectory(tempRoot);
+        }
+    }
+
+    [Fact]
     public async Task DownloadOutputUsesRunnerArgumentListAndDefaultCloudPath()
     {
         var tempRoot = CreateTempDirectory();
