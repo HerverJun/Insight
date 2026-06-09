@@ -9,15 +9,16 @@ namespace Insight.Handlers
         {
             Map(WebViewActions.SelectFolder, request =>
             {
-                var type = request.GetString("type");
-                if (!string.IsNullOrEmpty(type)) app.HandleSelectFolder(type);
+                var payload = WebViewPayloadBinder.Bind<SelectPathPayload>(request.Payload);
+                app.HandleSelectFolder(payload.Type);
             });
             Map(WebViewActions.SelectFile, request =>
             {
-                var type = request.GetString("type");
-                if (!string.IsNullOrEmpty(type)) app.HandleSelectFile(type);
+                var payload = WebViewPayloadBinder.Bind<SelectPathPayload>(request.Payload);
+                app.HandleSelectFile(payload.Type);
             });
-            Map(WebViewActions.SaveDefaultPythonPath, request => app.HandleSaveDefaultPythonPath(request.Payload));
+            Map(WebViewActions.SaveDefaultPythonPath, request =>
+                app.HandleSaveDefaultPythonPath(WebViewPayloadBinder.Bind<SaveDefaultPythonPathPayload>(request.Payload)));
             Map(WebViewActions.GetDefaultPythonPath, _ => app.HandleGetDefaultPythonPath());
         }
     }

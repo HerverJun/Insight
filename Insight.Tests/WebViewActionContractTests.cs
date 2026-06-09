@@ -51,6 +51,34 @@ public class WebViewActionContractTests
         Assert.Contains(messenger.Errors, error => error.Contains("未知前端指令"));
     }
 
+    [Fact]
+    public async Task DispatcherReportsInvalidTypedPayloadsWithoutThrowing()
+    {
+        var messenger = new RecordingFrontendMessenger();
+        var ui = new ImmediateUiDispatcher();
+        using var app = new InsightApplication(messenger, ui, new NullDialogService());
+        var dispatcher = WebViewCompositionRoot.CreateDispatcher(app, messenger);
+
+        await dispatcher.DispatchAsync("""{"action":"select_folder"}""", CancellationToken.None);
+
+        Assert.Contains(messenger.Errors, error => error.Contains("Invalid WebView payload"));
+        Assert.Contains(messenger.Errors, error => error.Contains(nameof(SelectPathPayload)));
+    }
+
+    [Fact]
+    public async Task DispatcherRejectsInvalidModelCommandPayloadsBeforeApplicationLogic()
+    {
+        var messenger = new RecordingFrontendMessenger();
+        var ui = new ImmediateUiDispatcher();
+        using var app = new InsightApplication(messenger, ui, new NullDialogService());
+        var dispatcher = WebViewCompositionRoot.CreateDispatcher(app, messenger);
+
+        await dispatcher.DispatchAsync("""{"action":"delete_model","path":"C:/models"}""", CancellationToken.None);
+
+        Assert.Contains(messenger.Errors, error => error.Contains("Invalid WebView payload"));
+        Assert.Contains(messenger.Errors, error => error.Contains(nameof(ModelFilePayload)));
+    }
+
     private static SortedSet<string> ExtractFrontendActions(string source)
     {
         return ExtractMatches(source, "action\\s*:\\s*['\"]([^'\"]+)['\"]");

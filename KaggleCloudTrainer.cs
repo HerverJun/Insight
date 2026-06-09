@@ -1,6 +1,8 @@
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Insight.Infrastructure.Processes;
+using Insight.Services.Configuration;
 
 namespace Insight
 {
@@ -37,6 +39,23 @@ namespace Insight
             Action<string, string>? onLog,
             Action<int>? onProgress)
         {
+            return await StartAsync(
+                options,
+                onLog,
+                onProgress,
+                new SystemProcessRunner(),
+                InsightAppPaths.CreateDefault(),
+                CancellationToken.None);
+        }
+
+        public static async Task<KaggleCloudTrainingResult> StartAsync(
+            KaggleCloudTrainingOptions options,
+            Action<string, string>? onLog,
+            Action<int>? onProgress,
+            IProcessRunner processRunner,
+            InsightAppPaths paths,
+            CancellationToken cancellationToken)
+        {
             ValidateOptions(options);
 
             var username = Slugify(options.KaggleUsername);
@@ -50,11 +69,7 @@ namespace Insight
             var datasetId = $"{username}/{datasetSlug}";
             var kernelId = $"{username}/{kernelSlug}";
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var jobRoot = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Insight",
-                "KaggleJobs",
-                $"{datasetSlug}_{timestamp}");
+            var jobRoot = Path.Combine(paths.CloudJobsRoot, "kaggle", $"{datasetSlug}_{timestamp}");
             var datasetDir = Path.Combine(jobRoot, "dataset");
             var kernelDir = Path.Combine(jobRoot, "kernel");
 
@@ -62,10 +77,11 @@ namespace Insight
             Directory.CreateDirectory(kernelDir);
 
             onLog?.Invoke("检查 Kaggle CLI...", "info");
-            await RunKaggleAsync(new[] { "--version" }, jobRoot, onLog);
+            await RunKaggleAsync(new[] { "--version" }, jobRoot, onLog, processRunner, cancellationToken);
             EnsureKaggleTokenExists();
 
             onProgress?.Invoke(5);
+            cancellationToken.ThrowIfCancellationRequested();
             await YoloDatasetExporter.ExportToDirectoryAsync(
                 sourcePaths: options.SourcePaths,
                 targetPath: datasetDir,
@@ -82,6 +98,7 @@ namespace Insight
                 onLog: onLog,
                 onProgress: progress => onProgress?.Invoke(Math.Min(60, 5 + (int)(progress * 0.55))));
 
+            cancellationToken.ThrowIfCancellationRequested();
             WriteDatasetMetadata(datasetDir, datasetId, $"{options.ProjectName} YOLO Dataset");
 
             onProgress?.Invoke(65);
@@ -90,6 +107,8 @@ namespace Insight
                 new[] { "datasets", "create", "-p", datasetDir, "--dir-mode", "zip", "-q" },
                 datasetDir,
                 onLog,
+                processRunner,
+                cancellationToken,
                 throwOnError: false);
 
             if (create.ExitCode != 0)
@@ -98,7 +117,9 @@ namespace Insight
                 await RunKaggleAsync(
                     new[] { "datasets", "version", "-p", datasetDir, "-m", $"Insight upload {timestamp}", "--dir-mode", "zip", "-q" },
                     datasetDir,
-                    onLog);
+                    onLog,
+                    processRunner,
+                    cancellationToken);
             }
 
             onProgress?.Invoke(80);
@@ -108,13 +129,17 @@ namespace Insight
             await RunKaggleAsync(
                 new[] { "kernels", "push", "-p", kernelDir },
                 kernelDir,
-                onLog);
+                onLog,
+                processRunner,
+                cancellationToken);
 
             onProgress?.Invoke(95);
             await RunKaggleAsync(
                 new[] { "kernels", "status", kernelId },
                 kernelDir,
                 onLog,
+                processRunner,
+                cancellationToken,
                 throwOnError: false);
 
             onProgress?.Invoke(100);
@@ -131,6 +156,23 @@ namespace Insight
             string outputDir,
             Action<string, string>? onLog)
         {
+            return await DownloadOutputAsync(
+                kernelId,
+                outputDir,
+                onLog,
+                new SystemProcessRunner(),
+                InsightAppPaths.CreateDefault(),
+                CancellationToken.None);
+        }
+
+        public static async Task<string> DownloadOutputAsync(
+            string kernelId,
+            string outputDir,
+            Action<string, string>? onLog,
+            IProcessRunner processRunner,
+            InsightAppPaths paths,
+            CancellationToken cancellationToken)
+        {
             if (string.IsNullOrWhiteSpace(kernelId) || !kernelId.Contains('/'))
             {
                 throw new ArgumentException("Kernel ID 不能为空，格式应为 username/kernel-slug。");
@@ -138,11 +180,7 @@ namespace Insight
 
             if (string.IsNullOrWhiteSpace(outputDir))
             {
-                outputDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Insight",
-                    "KaggleOutputs",
-                    Slugify(kernelId.Replace('/', '-')));
+                outputDir = Path.Combine(paths.CloudJobsRoot, "kaggle-outputs", Slugify(kernelId.Replace('/', '-')));
             }
 
             Directory.CreateDirectory(outputDir);
@@ -150,7 +188,9 @@ namespace Insight
             await RunKaggleAsync(
                 new[] { "kernels", "output", kernelId, "-p", outputDir },
                 outputDir,
-                onLog);
+                onLog,
+                processRunner,
+                cancellationToken);
             onLog?.Invoke($"Kaggle 输出已保存: {outputDir}", "success");
             return outputDir;
         }
@@ -264,13 +304,15 @@ namespace Insight
             IReadOnlyList<string> args,
             string workingDirectory,
             Action<string, string>? onLog,
+            IProcessRunner processRunner,
+            CancellationToken cancellationToken,
             bool throwOnError = true)
         {
             try
             {
-                return await RunProcessAsync("kaggle", args, workingDirectory, onLog, throwOnError);
+                return await RunProcessAsync("kaggle", args, workingDirectory, onLog, processRunner, cancellationToken, throwOnError);
             }
-            catch (InvalidOperationException ex) when (ex.InnerException is System.ComponentModel.Win32Exception)
+            catch (Exception ex) when (IsProcessStartFailure(ex))
             {
                 onLog?.Invoke("未在 PATH 中找到 kaggle 命令，尝试查找 Python Scripts 里的 kaggle.exe...", "warning");
             }
@@ -279,7 +321,7 @@ namespace Insight
             if (!string.IsNullOrWhiteSpace(kaggleExe))
             {
                 onLog?.Invoke($"使用 Kaggle CLI: {kaggleExe}", "info");
-                return await RunProcessAsync(kaggleExe, args, workingDirectory, onLog, throwOnError);
+                return await RunProcessAsync(kaggleExe, args, workingDirectory, onLog, processRunner, cancellationToken, throwOnError);
             }
 
             throw new InvalidOperationException(
@@ -318,64 +360,43 @@ namespace Insight
             IReadOnlyList<string> args,
             string workingDirectory,
             Action<string, string>? onLog,
+            IProcessRunner processRunner,
+            CancellationToken cancellationToken,
             bool throwOnError = true)
         {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = fileName,
-                WorkingDirectory = workingDirectory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = System.Text.Encoding.UTF8,
-                StandardErrorEncoding = System.Text.Encoding.UTF8
-            };
-
-            foreach (var arg in args)
-            {
-                startInfo.ArgumentList.Add(arg);
-            }
-
             var output = new List<string>();
-            using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (!string.IsNullOrWhiteSpace(e.Data))
+            var result = await processRunner.RunAsync(
+                new ProcessStartSpec
                 {
-                    output.Add(e.Data);
-                    onLog?.Invoke(e.Data, "info");
-                }
-            };
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (!string.IsNullOrWhiteSpace(e.Data))
+                    FileName = fileName,
+                    ArgumentList = args.ToArray(),
+                    WorkingDirectory = workingDirectory,
+                    EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["PYTHONIOENCODING"] = "utf-8"
+                    }
+                },
+                line =>
                 {
-                    output.Add(e.Data);
-                    onLog?.Invoke(e.Data, "warning");
-                }
-            };
+                    output.Add(line);
+                    onLog?.Invoke(line, "info");
+                },
+                cancellationToken);
 
-            try
+            var processResult = new ProcessResult(result.ExitCode ?? -1, string.Join(Environment.NewLine, output));
+            if (throwOnError && !result.Succeeded)
             {
-                process.Start();
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"无法启动命令: {fileName}", ex);
+                throw new InvalidOperationException($"Kaggle 命令执行失败，退出码: {processResult.ExitCode}\n{processResult.Output}");
             }
 
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            await process.WaitForExitAsync();
+            return processResult;
+        }
 
-            var result = new ProcessResult(process.ExitCode, string.Join(Environment.NewLine, output));
-            if (throwOnError && result.ExitCode != 0)
-            {
-                throw new InvalidOperationException($"Kaggle 命令执行失败，退出码: {result.ExitCode}\n{result.Output}");
-            }
-
-            return result;
+        private static bool IsProcessStartFailure(Exception ex)
+        {
+            return ex is Win32Exception ||
+                ex.InnerException is Win32Exception ||
+                ex is InvalidOperationException { InnerException: Win32Exception };
         }
 
         private readonly record struct ProcessResult(int ExitCode, string Output);

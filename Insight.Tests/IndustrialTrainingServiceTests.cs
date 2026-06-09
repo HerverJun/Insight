@@ -3,7 +3,11 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Insight.Bridge;
+using Insight.Infrastructure.Processes;
 using Insight.Services.Industrial;
+using Insight.Training;
+using Insight.Training.Jobs;
+using Insight.Training.Providers;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace Insight.Tests;
@@ -93,6 +97,72 @@ public class IndustrialTrainingServiceTests
         Assert.Contains("device=cpu", args);
         Assert.Contains("cache=False", args);
         Assert.Contains("amp=True", args);
+    }
+
+    [Fact]
+    public async Task StartTrainingRunUsesProcessRunnerAndSyncsProviderNeutralJobState()
+    {
+        var projectRoot = CreateTempDirectory();
+        try
+        {
+            var insightRoot = Path.Combine(projectRoot, ".insight");
+            Directory.CreateDirectory(insightRoot);
+            var yoloRoot = Path.Combine(insightRoot, "datasets", "ds_1", "yolo");
+            Directory.CreateDirectory(yoloRoot);
+            var dataYaml = Path.Combine(yoloRoot, "data.yaml");
+            File.WriteAllText(dataYaml, "path: .\nnames:\n  0: scratch\n", Encoding.UTF8);
+
+            var index = new IndustrialStoreIndex
+            {
+                DatasetVersions = new List<DatasetVersion>
+                {
+                    new()
+                    {
+                        Id = "ds_1",
+                        ProjectRoot = projectRoot,
+                        ProjectName = "Surface QA",
+                        DataYamlPath = dataYaml,
+                        Classes = new List<string> { "scratch" }
+                    }
+                }
+            };
+            File.WriteAllText(Path.Combine(insightRoot, "industrial_index.json"), JsonSerializer.Serialize(index, JsonOptions), Encoding.UTF8);
+
+            var runner = new IndustrialFakeProcessRunner();
+            var jobStore = new RecordingTrainingJobStore();
+            var service = new IndustrialTrainingService(
+                new RecordingFrontendMessenger(),
+                new YoloTrainingEngine(),
+                runner,
+                jobStore);
+
+            var run = await service.StartTrainingRunAsync(new TrainingRunConfig
+            {
+                ProjectRoot = projectRoot,
+                DatasetVersionId = "ds_1",
+                ExperimentName = "Boundary Test",
+                PythonPath = "python",
+                ModelSize = "v8s",
+                Epochs = 1,
+                BatchSize = 1,
+                ImgSize = 64,
+                Workers = 0,
+                GpuIndex = "cpu"
+            });
+
+            Assert.Equal("Completed", run.Status);
+            Assert.Equal(2, runner.Specs.Count);
+            Assert.Contains("detect train", runner.Specs[0].Arguments);
+            Assert.Contains("export model=", runner.Specs[1].Arguments);
+            Assert.True(File.Exists(run.BestPtPath));
+            Assert.True(File.Exists(run.OnnxPath));
+            Assert.Contains(jobStore.Records, x => x.JobId == run.Id && x.ProviderId == LocalYoloTrainingProvider.ProviderId && x.State == TrainingProviderJobState.Running);
+            Assert.Contains(jobStore.Records, x => x.JobId == run.Id && x.State == TrainingProviderJobState.Completed);
+        }
+        finally
+        {
+            DeleteTempDirectory(projectRoot);
+        }
     }
 
     [Fact]
@@ -399,5 +469,57 @@ public class IndustrialTrainingServiceTests
         public void Log(string message, string type = "info") => Messages.Add(new { action = "log", message, type });
         public void Error(string message) => Errors.Add(message);
         public void Complete(string message) => Messages.Add(new { action = "complete", message });
+    }
+
+    private sealed class IndustrialFakeProcessRunner : IProcessRunner
+    {
+        public List<ProcessStartSpec> Specs { get; } = new();
+
+        public Task<ProcessRunResult> RunAsync(
+            ProcessStartSpec spec,
+            Action<string>? onOutput,
+            CancellationToken cancellationToken)
+        {
+            Specs.Add(spec);
+
+            if (Specs.Count == 1)
+            {
+                onOutput?.Invoke("1/1 2.75G 1.026 1.266 1.18 14 64");
+                onOutput?.Invoke("all 1 1 0.91 0.82 0.76 0.55");
+                var weights = Path.Combine(spec.WorkingDirectory, "runs", "detect", "train", "weights");
+                Directory.CreateDirectory(weights);
+                File.WriteAllText(Path.Combine(weights, "best.pt"), "best", Encoding.UTF8);
+                File.WriteAllText(Path.Combine(weights, "last.pt"), "last", Encoding.UTF8);
+            }
+            else
+            {
+                var best = Directory.GetFiles(spec.WorkingDirectory, "best.pt", SearchOption.AllDirectories).Single();
+                File.WriteAllBytes(Path.ChangeExtension(best, ".onnx"), new byte[] { 1, 2, 3, 4 });
+                onOutput?.Invoke("export complete");
+            }
+
+            return Task.FromResult(new ProcessRunResult(0, cancellationToken.IsCancellationRequested, "ok"));
+        }
+    }
+
+    private sealed class RecordingTrainingJobStore : ITrainingJobStore
+    {
+        public List<TrainingJobRecord> Records { get; } = new();
+
+        public Task UpsertAsync(TrainingJobRecord record, CancellationToken cancellationToken)
+        {
+            Records.Add(record);
+            return Task.CompletedTask;
+        }
+
+        public Task<TrainingJobRecord?> GetAsync(string jobId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Records.LastOrDefault(x => x.JobId == jobId));
+        }
+
+        public Task<IReadOnlyList<TrainingJobRecord>> ListAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<TrainingJobRecord>>(Records.ToArray());
+        }
     }
 }

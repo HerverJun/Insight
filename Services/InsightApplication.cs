@@ -2,6 +2,11 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Text.Json;
 using Insight.Bridge;
+using Insight.Infrastructure.Cloud.Kaggle;
+using Insight.Infrastructure.Processes;
+using Insight.Infrastructure.Training;
+using Insight.Services.Cloud.Kaggle;
+using Insight.Services.Configuration;
 using Insight.Services.Industrial;
 using Insight.Services.Training;
 using Insight.Training;
@@ -15,17 +20,54 @@ namespace Insight.Services
         private readonly IFrontendMessenger _messenger;
         private readonly IUiDispatcher _ui;
         private readonly IAppDialogService _dialogs;
+        private readonly InsightAppPaths _paths;
+        private readonly IProcessRunner _processRunner;
+        private readonly IKaggleClient _kaggleClient;
         private readonly TrainingOrchestrator _training;
         private readonly IndustrialTrainingService _industrialTraining;
         private readonly SamLabelingService _samLabeling;
 
         public InsightApplication(IFrontendMessenger messenger, IUiDispatcher ui, IAppDialogService dialogs)
+            : this(messenger, ui, dialogs, InsightAppPaths.CreateDefault())
+        {
+        }
+
+        public InsightApplication(
+            IFrontendMessenger messenger,
+            IUiDispatcher ui,
+            IAppDialogService dialogs,
+            InsightAppPaths paths)
+            : this(
+                messenger,
+                ui,
+                dialogs,
+                paths,
+                new SystemProcessRunner(),
+                new KaggleCliClient(new SystemProcessRunner(), paths))
+        {
+        }
+
+        public InsightApplication(
+            IFrontendMessenger messenger,
+            IUiDispatcher ui,
+            IAppDialogService dialogs,
+            InsightAppPaths paths,
+            IProcessRunner processRunner,
+            IKaggleClient kaggleClient)
         {
             _messenger = messenger;
             _ui = ui;
             _dialogs = dialogs;
-            _training = new TrainingOrchestrator(_messenger, new YoloTrainingEngine());
-            _industrialTraining = new IndustrialTrainingService(_messenger, new YoloTrainingEngine());
+            _paths = paths;
+            _processRunner = processRunner;
+            _kaggleClient = kaggleClient;
+            _paths.EnsureUserRoots();
+            _training = new TrainingOrchestrator(_messenger, new YoloTrainingEngine(), _processRunner, _paths);
+            _industrialTraining = new IndustrialTrainingService(
+                _messenger,
+                new YoloTrainingEngine(),
+                _processRunner,
+                new FileTrainingJobStore(_paths));
             _samLabeling = new SamLabelingService(_messenger, _ui);
         }
 
@@ -59,9 +101,12 @@ namespace Insight.Services
 
         public void HandleOpenModelFolder(JsonElement data)
         {
-            if (!data.TryGetProperty("path", out var modelPathProp)) return;
+            HandleOpenModelFolder(WebViewPayloadBinder.Bind<DirectoryPathPayload>(data));
+        }
 
-            var modelPath = modelPathProp.GetString();
+        public void HandleOpenModelFolder(DirectoryPathPayload payload)
+        {
+            var modelPath = payload.Path;
             try
             {
                 if (!string.IsNullOrEmpty(modelPath) && File.Exists(modelPath))
@@ -487,25 +532,20 @@ namespace Insight.Services
         {
             try
             {
-                var options = new KaggleCloudTrainingOptions
-                {
-                    SourcePaths = data.GetProperty("sourcePaths").EnumerateArray().Select(x => x.GetString()!).ToList(),
-                    Classes = data.GetProperty("classes").EnumerateArray().Select(x => x.GetString() ?? "").ToList(),
-                    ProjectName = data.TryGetProperty("projectName", out var pName) ? pName.GetString() ?? "Insight" : "Insight",
-                    KaggleUsername = data.TryGetProperty("kaggleUsername", out var userProp) ? userProp.GetString() ?? "" : "",
-                    DatasetSlug = data.TryGetProperty("datasetSlug", out var datasetProp) ? datasetProp.GetString() ?? "" : "",
-                    KernelSlug = data.TryGetProperty("kernelSlug", out var kernelProp) ? kernelProp.GetString() ?? "" : "",
-                    YoloVersion = data.TryGetProperty("yoloVersion", out var yoloProp) ? yoloProp.GetString() ?? "yolov8" : "yolov8",
-                    ModelSize = data.TryGetProperty("modelSize", out var modelProp) ? modelProp.GetString() ?? "s" : "s",
-                    Epochs = data.TryGetProperty("epochs", out var epochsProp) && epochsProp.ValueKind == JsonValueKind.Number ? epochsProp.GetInt32() : 300,
-                    BatchSize = data.TryGetProperty("batchSize", out var batchProp) && batchProp.ValueKind == JsonValueKind.Number ? batchProp.GetInt32() : 16,
-                    ImgSize = data.TryGetProperty("imgSize", out var imgProp) && imgProp.ValueKind == JsonValueKind.Number ? imgProp.GetInt32() : 640,
-                    Patience = data.TryGetProperty("patience", out var patProp) && patProp.ValueKind == JsonValueKind.Number ? patProp.GetInt32() : 50,
-                    Workers = data.TryGetProperty("workers", out var workersProp) && workersProp.ValueKind == JsonValueKind.Number ? workersProp.GetInt32() : 8,
-                    GpuIndex = data.TryGetProperty("gpuIndex", out var gpuProp) ? gpuProp.GetString() ?? "0" : "0",
-                    SplitRatio = data.TryGetProperty("splitRatio", out var splitProp) && splitProp.ValueKind == JsonValueKind.Number ? splitProp.GetDouble() : 0.8
-                };
+                await HandleStartKaggleTrainingAsync(WebViewPayloadBinder.Bind<StartKaggleTrainingPayload>(data));
+            }
+            catch (Exception ex)
+            {
+                SendError($"Kaggle 云训练参数解析失败: {ex.Message}");
+                SendToFrontend(new { action = "kaggle_training_failed" });
+            }
+        }
 
+        public async Task HandleStartKaggleTrainingAsync(StartKaggleTrainingPayload payload)
+        {
+            try
+            {
+                var options = payload.ToOptions();
                 SendLog("准备提交 Kaggle 云端训练...", "info");
                 SendToFrontend(new { action = "kaggle_progress", progress = 0, status = "准备 Kaggle 云训练" });
 
@@ -513,10 +553,14 @@ namespace Insight.Services
                 {
                     try
                     {
-                        var result = await KaggleCloudTrainer.StartAsync(
-                            options,
-                            (msg, type) => SendLog(msg, type),
-                            progress => SendToFrontend(new { action = "kaggle_progress", progress, status = "Kaggle 云训练提交中" }));
+                        var result = await _kaggleClient.SubmitTrainingAsync(
+                            new KaggleTrainingSubmissionRequest
+                            {
+                                Options = options,
+                                OnLog = (msg, type) => SendLog(msg, type),
+                                OnProgress = progress => SendToFrontend(new { action = "kaggle_progress", progress, status = "Kaggle 云训练提交中" })
+                            },
+                            CancellationToken.None);
 
                         SendToFrontend(new
                         {
@@ -545,15 +589,31 @@ namespace Insight.Services
         {
             try
             {
-                var kernelId = data.TryGetProperty("kernelId", out var kernelProp) ? kernelProp.GetString() ?? "" : "";
-                var outputDir = data.TryGetProperty("outputDir", out var outputProp) ? outputProp.GetString() ?? "" : "";
+                await HandleDownloadKaggleOutputAsync(WebViewPayloadBinder.Bind<DownloadKaggleOutputPayload>(data));
+            }
+            catch (Exception ex)
+            {
+                SendError($"Kaggle 输出下载参数解析失败: {ex.Message}");
+            }
+        }
 
+        public async Task HandleDownloadKaggleOutputAsync(DownloadKaggleOutputPayload payload)
+        {
+            try
+            {
                 SendLog("准备下载 Kaggle 输出...", "info");
                 await Task.Run(async () =>
                 {
                     try
                     {
-                        var resolvedOutputDir = await KaggleCloudTrainer.DownloadOutputAsync(kernelId, outputDir, (msg, type) => SendLog(msg, type));
+                        var resolvedOutputDir = await _kaggleClient.DownloadOutputAsync(
+                            new KaggleOutputDownloadRequest
+                            {
+                                KernelId = payload.KernelId,
+                                OutputDirectory = payload.OutputDir,
+                                OnLog = (msg, type) => SendLog(msg, type)
+                            },
+                            CancellationToken.None);
                         SendToFrontend(new { action = "kaggle_output_downloaded", outputDir = resolvedOutputDir });
                     }
                     catch (Exception ex)
@@ -995,32 +1055,35 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
         private string GetPythonConfigPath()
         {
-            var appDir = AppDomain.CurrentDomain.BaseDirectory;
-            return Path.Combine(appDir, "python_config.json");
+            return _paths.PythonConfigPath;
         }
 
         public void HandleSaveDefaultPythonPath(JsonElement data)
         {
             try
             {
-                if (data.TryGetProperty("path", out var pathProp))
-                {
-                    var pythonPath = pathProp.GetString();
-                    if (!string.IsNullOrWhiteSpace(pythonPath))
-                    {
-                        var configPath = GetPythonConfigPath();
-                        var config = new { defaultPythonPath = pythonPath };
-                        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                        File.WriteAllText(configPath, json);
+                HandleSaveDefaultPythonPath(WebViewPayloadBinder.Bind<SaveDefaultPythonPathPayload>(data));
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "python_path_saved", success = false, error = ex.Message });
+                SendError($"保存默认路径失败: {ex.Message}");
+            }
+        }
 
-                        SendToFrontend(new { action = "python_path_saved", success = true, path = pythonPath });
-                        SendLog($"默认 Python 路径已保存: {pythonPath}", "success");
-                    }
-                    else
-                    {
-                        SendToFrontend(new { action = "python_path_saved", success = false, error = "路径为空" });
-                    }
-                }
+        public void HandleSaveDefaultPythonPath(SaveDefaultPythonPathPayload payload)
+        {
+            try
+            {
+                var pythonPath = payload.Path;
+                var configPath = GetPythonConfigPath();
+                var config = new { defaultPythonPath = pythonPath };
+                var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+                Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
+                File.WriteAllText(configPath, json);
+
+                SendToFrontend(new { action = "python_path_saved", success = true, path = pythonPath });
+                SendLog($"默认 Python 路径已保存: {pythonPath}", "success");
             }
             catch (Exception ex)
             {
@@ -1067,9 +1130,14 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
         public void HandleGetModels(JsonElement data)
         {
+            HandleGetModels(WebViewPayloadBinder.Bind<DirectoryPathPayload>(data));
+        }
+
+        public void HandleGetModels(DirectoryPathPayload payload)
+        {
             try
             {
-                var path = data.GetProperty("path").GetString();
+                var path = payload.Path;
                 if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
                 {
                     SendToFrontend(new { action = "models_loaded", models = new List<object>() });
@@ -1128,10 +1196,15 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
         public void HandleDeleteModel(JsonElement data)
         {
+            HandleDeleteModel(WebViewPayloadBinder.Bind<ModelFilePayload>(data));
+        }
+
+        public void HandleDeleteModel(ModelFilePayload payload)
+        {
             try
             {
-                var path = data.GetProperty("path").GetString();
-                var fileName = data.GetProperty("fileName").GetString();
+                var path = payload.Path;
+                var fileName = payload.FileName;
                 var fullPath = ResolveModelFilePath(path, fileName, requireExisting: true);
                 if (fullPath == null)
                 {
@@ -1159,11 +1232,16 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
 
         public void HandleRenameModel(JsonElement data)
         {
+            HandleRenameModel(WebViewPayloadBinder.Bind<RenameModelPayload>(data));
+        }
+
+        public void HandleRenameModel(RenameModelPayload payload)
+        {
             try
             {
-                var path = data.GetProperty("path").GetString();
-                var oldName = data.GetProperty("oldName").GetString();
-                var newName = data.GetProperty("newName").GetString();
+                var path = payload.Path;
+                var oldName = payload.OldName;
+                var newName = payload.NewName;
 
                 var oldPath = ResolveModelFilePath(path, oldName, requireExisting: true);
                 var newPath = ResolveModelFilePath(path, newName, requireExisting: false);
@@ -1242,87 +1320,95 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
             return fullPath;
         }
 
-        public async Task HandleConvertModelAsync(JsonElement data)
+        public async Task HandleConvertModelAsync(ConvertModelPayload payload)
         {
-            // 手动转换调用
             try
             {
-                var sourcePath = data.GetProperty("sourcePath").GetString(); // full path to .pt
-                var targetDir = data.GetProperty("targetDir").GetString();
+                var sourcePath = payload.SourcePath;
+                var targetDir = payload.TargetDir;
 
                 if (string.IsNullOrWhiteSpace(sourcePath) ||
                     !Path.GetExtension(sourcePath).Equals(".pt", StringComparison.OrdinalIgnoreCase) ||
                     !File.Exists(sourcePath))
                 {
-                    SendError("源 PT 文件不存在或类型无效");
+                    SendError("Source PT file does not exist or is invalid.");
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(targetDir))
                 {
-                    SendError("目标目录不能为空");
+                    SendError("Target directory is required.");
                     return;
                 }
 
-                string pythonPath = data.TryGetProperty("pythonPath", out var pyEl) ? pyEl.GetString() ?? "" : "";
+                var pythonPath = payload.PythonPath;
                 if (string.IsNullOrWhiteSpace(pythonPath))
                 {
-                    pythonPath = @"C:\conda_envs\yolo\python.exe"; // Fallback
+                    pythonPath = @"C:\conda_envs\yolo\python.exe";
                 }
 
-                SendLog("开始手动转换...", "info");
+                SendLog("Starting manual model conversion...", "info");
 
                 var workDir = Path.GetDirectoryName(sourcePath);
                 if (string.IsNullOrWhiteSpace(workDir))
                 {
-                    SendError("源文件目录无效");
+                    SendError("Source file directory is invalid.");
                     return;
                 }
 
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        RunExportCommand(pythonPath, workDir, sourcePath, targetDir, Path.GetFileNameWithoutExtension(sourcePath) + ".onnx");
-                    }
-                    catch (Exception ex)
-                    {
-                        SendError($"转换失败: {ex.Message}");
-                    }
-                });
+                await RunExportCommandAsync(
+                    pythonPath,
+                    workDir,
+                    sourcePath,
+                    targetDir,
+                    Path.GetFileNameWithoutExtension(sourcePath) + ".onnx",
+                    CancellationToken.None);
             }
             catch (Exception ex)
             {
-                SendError($"转换请求失败: {ex.Message}");
+                SendError($"Model conversion request failed: {ex.Message}");
             }
         }
 
-        private void RunExportCommand(string pythonPath, string workDir, string ptPath, string targetDir, string onnxName)
+        public async Task HandleConvertModelAsync(JsonElement data)
         {
-            var exportArgs = $"-c \"from ultralytics.cfg import entrypoint; entrypoint()\" export model=\"{ptPath}\" format=onnx simplify=True";
+            await HandleConvertModelAsync(WebViewPayloadBinder.Bind<ConvertModelPayload>(data));
+        }
 
-            var p = new System.Diagnostics.Process();
-            p.StartInfo.FileName = pythonPath;
-            p.StartInfo.Arguments = exportArgs;
-            p.StartInfo.WorkingDirectory = workDir;
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.RedirectStandardError = true;
-            p.StartInfo.CreateNoWindow = true;
-            p.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-            p.StartInfo.EnvironmentVariables["KMP_DUPLICATE_LIB_OK"] = "TRUE";
+        private async Task RunExportCommandAsync(
+            string pythonPath,
+            string workDir,
+            string ptPath,
+            string targetDir,
+            string onnxName,
+            CancellationToken cancellationToken)
+        {
+            var result = await _processRunner.RunAsync(
+                new ProcessStartSpec
+                {
+                    FileName = pythonPath,
+                    WorkingDirectory = workDir,
+                    ArgumentList = new[]
+                    {
+                        "-c",
+                        "from ultralytics.cfg import entrypoint; entrypoint()",
+                        "export",
+                        $"model={ptPath}",
+                        "format=onnx",
+                        "simplify=True"
+                    },
+                    EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["PYTHONIOENCODING"] = "utf-8",
+                        ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+                    }
+                },
+                line => SendLog(line),
+                cancellationToken);
 
-            p.OutputDataReceived += (s, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) SendLog(e.Data); };
-            p.ErrorDataReceived += (s, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) SendLog(e.Data); };
-
-            p.Start();
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-
-            if (p.ExitCode == 0)
+            if (result.Succeeded)
             {
-                var exportedOnnx = ptPath.Replace(".pt", ".onnx"); // Ultralytics saves in same folder
+                var exportedOnnx = Path.ChangeExtension(ptPath, ".onnx"); // Ultralytics saves in same folder
                 if (File.Exists(exportedOnnx))
                 {
                     if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
@@ -1331,7 +1417,17 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
                     SendLog($"★ 转换成功! 保存至: {finalPath}", "success");
                     SendToFrontend(new { action = "model_operation_complete" });
                 }
+
+                return;
             }
+
+            if (result.WasCanceled)
+            {
+                SendError("Model conversion was canceled.");
+                return;
+            }
+
+            SendError($"Model conversion failed with exit code {result.ExitCode}.");
         }
 
         public void HandleToolConvert(JsonElement data)
@@ -1390,38 +1486,37 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz={p.ImgSize
         }
         public void HandleOpenOutput(JsonElement data)
         {
+            HandleOpenOutput(WebViewPayloadBinder.Bind<DirectoryPathPayload>(data));
+        }
+
+        public void HandleOpenOutput(DirectoryPathPayload payload)
+        {
             try
             {
-                if (data.TryGetProperty("path", out var pathElement))
+                var path = payload.Path;
+                if (string.IsNullOrWhiteSpace(path)) return;
+
+                if (!Directory.Exists(path) && !Path.IsPathRooted(path))
                 {
-                    var p = pathElement.GetString();
-                    if (string.IsNullOrWhiteSpace(p)) return;
+                    path = Path.GetFullPath(path);
+                }
 
-                    if (!Directory.Exists(p))
-                    {
-                        // 尝试解析相对路径
-                        if (!Path.IsPathRooted(p))
-                        {
-                            p = Path.GetFullPath(p);
-                        }
-                    }
-
-                    if (Directory.Exists(p))
-                    {
-                        System.Diagnostics.Process.Start("explorer.exe", p);
-                        SendLog($"已打开文件夹: {p}");
-                    }
-                    else
-                    {
-                        SendError($"文件夹不存在: {p}");
-                    }
+                if (Directory.Exists(path))
+                {
+                    _dialogs.OpenFolder(path);
+                    SendLog($"Opened folder: {path}");
+                }
+                else
+                {
+                    SendError($"Folder does not exist: {path}");
                 }
             }
             catch (Exception ex)
             {
-                SendError($"无法打开文件夹: {ex.Message}");
+                SendError($"Could not open folder: {ex.Message}");
             }
         }
+
         public void HandleGetSAMModels()
         {
             _samLabeling.HandleGetSAMModels();

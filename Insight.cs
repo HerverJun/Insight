@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Insight.Bridge;
 using Insight.Handlers;
 using Insight.Services;
+using Insight.Services.Configuration;
 using Microsoft.Web.WebView2.Core;
 
 namespace Insight
@@ -65,9 +66,7 @@ namespace Insight
         {
             try
             {
-                var userDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Insight", "WebView2");
+                var userDataFolder = InsightAppPaths.CreateDefault().WebViewUserDataRoot;
 
                 var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await webView21.EnsureCoreWebView2Async(env);

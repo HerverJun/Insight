@@ -7,8 +7,10 @@ namespace Insight.Handlers
     {
         public CloudTrainingCommandHandler(InsightApplication app)
         {
-            Map(WebViewActions.StartKaggleTraining, (request, ct) => app.HandleStartKaggleTrainingAsync(request.Payload));
-            Map(WebViewActions.DownloadKaggleOutput, (request, ct) => app.HandleDownloadKaggleOutputAsync(request.Payload));
+            Map(WebViewActions.StartKaggleTraining, (request, ct) =>
+                app.HandleStartKaggleTrainingAsync(WebViewPayloadBinder.Bind<StartKaggleTrainingPayload>(request.Payload)));
+            Map(WebViewActions.DownloadKaggleOutput, (request, ct) =>
+                app.HandleDownloadKaggleOutputAsync(WebViewPayloadBinder.Bind<DownloadKaggleOutputPayload>(request.Payload)));
         }
     }
 }

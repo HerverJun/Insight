@@ -1,8 +1,9 @@
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Insight.Bridge;
+using Insight.Infrastructure.Processes;
+using Insight.Services.Configuration;
 using Insight.Training;
 
 namespace Insight.Services.Training
@@ -11,7 +12,9 @@ namespace Insight.Services.Training
     {
         private readonly IFrontendMessenger _messenger;
         private readonly ITrainingEngine _engine;
-        private Process? _trainingProcess;
+        private readonly IProcessRunner _processRunner;
+        private readonly InsightAppPaths _paths;
+        private CancellationTokenSource? _trainingCts;
         private bool _isTraining;
         private bool _trainingStopRequested;
         private double _lastBoxLoss;
@@ -19,9 +22,20 @@ namespace Insight.Services.Training
         private double _lastMap5095;
 
         public TrainingOrchestrator(IFrontendMessenger messenger, ITrainingEngine engine)
+            : this(messenger, engine, new SystemProcessRunner(), InsightAppPaths.CreateDefault())
+        {
+        }
+
+        public TrainingOrchestrator(
+            IFrontendMessenger messenger,
+            ITrainingEngine engine,
+            IProcessRunner processRunner,
+            InsightAppPaths paths)
         {
             _messenger = messenger;
             _engine = engine;
+            _processRunner = processRunner;
+            _paths = paths;
         }
 
         public async Task StartAsync(JsonElement data)
@@ -40,27 +54,31 @@ namespace Insight.Services.Training
                 var launchPlan = _engine.BuildLaunchPlan(request);
 
                 _isTraining = true;
+                _trainingCts?.Dispose();
+                _trainingCts = new CancellationTokenSource();
                 _messenger.Log("正在启动训练进程...", "info");
                 _messenger.Log($"解释器: {launchPlan.PythonPath}", "info");
                 _messenger.Log($"参数: {launchPlan.Arguments}", "info");
 
-                await Task.Run(() => RunTrainingProcess(launchPlan, request.Params));
+                await RunTrainingProcessAsync(launchPlan, request.Params, _trainingCts.Token);
             }
             catch (Exception ex)
             {
                 _isTraining = false;
+                _trainingCts?.Dispose();
+                _trainingCts = null;
                 _messenger.Error($"启动训练失败: {ex.Message}");
             }
         }
 
         public void Stop()
         {
-            if (_trainingProcess == null || _trainingProcess.HasExited) return;
+            if (!_isTraining || _trainingCts == null) return;
 
             try
             {
                 _trainingStopRequested = true;
-                _trainingProcess.Kill();
+                _trainingCts.Cancel();
                 _messenger.Log("已发送停止信号。", "warning");
                 _messenger.Send(new { action = "training_stopped" });
             }
@@ -98,11 +116,15 @@ namespace Insight.Services.Training
 
         public void Dispose()
         {
-            _trainingProcess?.Dispose();
-            _trainingProcess = null;
+            _trainingCts?.Cancel();
+            _trainingCts?.Dispose();
+            _trainingCts = null;
         }
 
-        private void RunTrainingProcess(TrainingLaunchPlan launchPlan, TrainingParams parameters)
+        private async Task RunTrainingProcessAsync(
+            TrainingLaunchPlan launchPlan,
+            TrainingParams parameters,
+            CancellationToken cancellationToken)
         {
             int? exitCode = null;
             bool started = false;
@@ -110,50 +132,49 @@ namespace Insight.Services.Training
 
             try
             {
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = launchPlan.PythonPath,
-                    Arguments = launchPlan.Arguments,
-                    WorkingDirectory = launchPlan.WorkingDirectory,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-                process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                process.StartInfo.EnvironmentVariables["KMP_DUPLICATE_LIB_OK"] = "TRUE";
-                process.OutputDataReceived += (_, e) => ParseTrainingOutput(e.Data);
-                process.ErrorDataReceived += (_, e) => ParseTrainingOutput(e.Data);
+                var result = await _processRunner.RunAsync(
+                    new ProcessStartSpec
+                    {
+                        FileName = launchPlan.PythonPath,
+                        Arguments = launchPlan.Arguments,
+                        WorkingDirectory = launchPlan.WorkingDirectory,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8,
+                        EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["PYTHONIOENCODING"] = "utf-8",
+                            ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+                        }
+                    },
+                    ParseTrainingOutput,
+                    cancellationToken);
 
-                _trainingProcess = process;
-                process.Start();
-                started = true;
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
-                exitCode = process.ExitCode;
+                started = !result.WasCanceled;
+                exitCode = result.ExitCode;
             }
             catch (Exception ex)
             {
-                _messenger.Error($"训练进程异常: {ex.Message}");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _messenger.Error($"训练进程异常: {ex.Message}");
+                }
             }
             finally
             {
+                await CompleteTrainingRunAsync(started, exitCode, launchPlan, parameters, trainingStartTime, cancellationToken);
                 _isTraining = false;
-                _trainingProcess = null;
-                CompleteTrainingRun(started, exitCode, launchPlan, parameters, trainingStartTime);
+                _trainingCts?.Dispose();
+                _trainingCts = null;
             }
         }
 
-        private void CompleteTrainingRun(
+        private async Task CompleteTrainingRunAsync(
             bool started,
             int? exitCode,
             TrainingLaunchPlan launchPlan,
             TrainingParams parameters,
-            DateTime trainingStartTime)
+            DateTime trainingStartTime,
+            CancellationToken cancellationToken)
         {
             if (_trainingStopRequested)
             {
@@ -177,7 +198,12 @@ namespace Insight.Services.Training
                 return;
             }
 
-            var exported = ExportOnnx(launchPlan.PythonPath, launchPlan.WorkingDirectory, bestArtifact, parameters);
+            var exported = await ExportOnnxAsync(
+                launchPlan.PythonPath,
+                launchPlan.WorkingDirectory,
+                bestArtifact,
+                parameters,
+                cancellationToken);
             _messenger.Send(new { action = "training_finished", success = exported });
         }
 
@@ -217,7 +243,12 @@ namespace Insight.Services.Training
             }
         }
 
-        private bool ExportOnnx(string pythonPath, string workDir, string bestPt, TrainingParams parameters)
+        private async Task<bool> ExportOnnxAsync(
+            string pythonPath,
+            string workDir,
+            string bestPt,
+            TrainingParams parameters,
+            CancellationToken cancellationToken)
         {
             if (!File.Exists(bestPt))
             {
@@ -230,25 +261,22 @@ namespace Insight.Services.Training
 
             try
             {
-                using var process = new Process();
-                process.StartInfo.FileName = pythonPath;
-                process.StartInfo.Arguments = _engine.BuildExportArguments(bestPt);
-                process.StartInfo.WorkingDirectory = workDir;
-                process.StartInfo.UseShellExecute = false;
-                process.StartInfo.RedirectStandardOutput = true;
-                process.StartInfo.RedirectStandardError = true;
-                process.StartInfo.CreateNoWindow = true;
-                process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                process.StartInfo.EnvironmentVariables["KMP_DUPLICATE_LIB_OK"] = "TRUE";
-                process.OutputDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) _messenger.Log(e.Data); };
-                process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrWhiteSpace(e.Data)) _messenger.Log(e.Data); };
+                var result = await _processRunner.RunAsync(
+                    new ProcessStartSpec
+                    {
+                        FileName = pythonPath,
+                        Arguments = _engine.BuildExportArguments(bestPt),
+                        WorkingDirectory = workDir,
+                        EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["PYTHONIOENCODING"] = "utf-8",
+                            ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+                        }
+                    },
+                    line => _messenger.Log(line),
+                    cancellationToken);
 
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
-
-                if (process.ExitCode != 0)
+                if (!result.Succeeded)
                 {
                     _messenger.Log("ONNX 导出进程非正常退出。", "error");
                     return false;
@@ -344,7 +372,7 @@ namespace Insight.Services.Training
 
         private string GetTrainingHistoryPath()
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "training_history.json");
+            return _paths.TrainingHistoryPath;
         }
 
         private void SaveTrainingHistoryEntry(string modelPath, TrainingParams parameters, string projectName)
@@ -380,6 +408,7 @@ namespace Insight.Services.Training
                     mAP5095 = Math.Round(_lastMap5095, 4)
                 });
 
+                Directory.CreateDirectory(Path.GetDirectoryName(historyPath)!);
                 var json = JsonSerializer.Serialize(history, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(historyPath, json);
                 _messenger.Log("训练记录已保存到历史", "success");

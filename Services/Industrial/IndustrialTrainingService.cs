@@ -7,7 +7,12 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Insight.Bridge;
+using Insight.Infrastructure.Processes;
+using Insight.Infrastructure.Training;
+using Insight.Services.Configuration;
 using Insight.Training;
+using Insight.Training.Jobs;
+using Insight.Training.Providers;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
@@ -25,21 +30,38 @@ namespace Insight.Services.Industrial
 
         private readonly IFrontendMessenger _messenger;
         private readonly ITrainingEngine _metricParser;
+        private readonly IProcessRunner _processRunner;
+        private readonly ITrainingJobStore _jobStore;
         private readonly object _processLock = new();
-        private Process? _activeProcess;
+        private CancellationTokenSource? _activeRunCts;
         private string _activeRunId = "";
         private bool _stopRequested;
 
         public IndustrialTrainingService(IFrontendMessenger messenger, ITrainingEngine? metricParser = null)
+            : this(
+                messenger,
+                metricParser,
+                new SystemProcessRunner(),
+                new FileTrainingJobStore(InsightAppPaths.CreateDefault()))
+        {
+        }
+
+        public IndustrialTrainingService(
+            IFrontendMessenger messenger,
+            ITrainingEngine? metricParser,
+            IProcessRunner processRunner,
+            ITrainingJobStore jobStore)
         {
             _messenger = messenger;
             _metricParser = metricParser ?? new YoloTrainingEngine();
+            _processRunner = processRunner;
+            _jobStore = jobStore;
         }
 
         public void Dispose()
         {
             StopTrainingRun();
-            _activeProcess?.Dispose();
+            _activeRunCts?.Dispose();
         }
 
         public async Task HandleCreateDatasetVersionAsync(JsonElement data)
@@ -818,7 +840,7 @@ namespace Insight.Services.Industrial
             var dataset = FindDatasetVersion(config.ProjectRoot, config.DatasetVersionId);
             var runId = "run_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + "_" + Guid.NewGuid().ToString("N")[..6];
             var runRoot = Path.Combine(GetInsightRoot(config.ProjectRoot), "runs", runId);
-            ReserveActiveRun(runId);
+            var cancellationToken = ReserveActiveRun(runId);
 
             try
             {
@@ -841,9 +863,10 @@ namespace Insight.Services.Industrial
                 SaveJson(run.ConfigPath, config);
                 SaveJson(run.EnvironmentPath, CaptureEnvironment(config.PythonPath, runRoot));
                 UpsertRun(config.ProjectRoot, run);
+                TrySyncTrainingJob(run);
                 _messenger.Send(new { action = "industrial_training_started", run });
 
-                await Task.Run(() => ExecuteTrainingRun(run, dataset));
+                await ExecuteTrainingRunAsync(run, dataset, cancellationToken);
                 return run;
             }
             catch
@@ -857,15 +880,12 @@ namespace Insight.Services.Industrial
         {
             lock (_processLock)
             {
-                if (string.IsNullOrWhiteSpace(_activeRunId) && (_activeProcess == null || _activeProcess.HasExited)) return;
+                if (string.IsNullOrWhiteSpace(_activeRunId) && _activeRunCts == null) return;
 
                 try
                 {
                     _stopRequested = true;
-                    if (_activeProcess != null && !_activeProcess.HasExited)
-                    {
-                        _activeProcess.Kill(entireProcessTree: true);
-                    }
+                    _activeRunCts?.Cancel();
 
                     _messenger.Log($"已发送停止信号: {_activeRunId}", "warning");
                 }
@@ -932,11 +952,15 @@ namespace Insight.Services.Industrial
             return args.ToString().Trim();
         }
 
-        private void ExecuteTrainingRun(TrainingRunRecord run, DatasetVersion dataset)
+        private async Task ExecuteTrainingRunAsync(
+            TrainingRunRecord run,
+            DatasetVersion dataset,
+            CancellationToken cancellationToken)
         {
             run.Status = "Running";
             run.StartedAt = DateTime.Now;
             UpsertRun(run.ProjectRoot, run);
+            TrySyncTrainingJob(run);
             AppendLog(run, "训练进程启动。");
 
             if (IsStopRequested(run.Id))
@@ -957,41 +981,27 @@ namespace Insight.Services.Industrial
 
             try
             {
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = run.Config.PythonPath,
-                    Arguments = arguments,
-                    WorkingDirectory = run.RunRoot,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-                process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                process.StartInfo.EnvironmentVariables["KMP_DUPLICATE_LIB_OK"] = "TRUE";
-                process.OutputDataReceived += (_, e) => HandleTrainingOutput(run, e.Data);
-                process.ErrorDataReceived += (_, e) => HandleTrainingOutput(run, e.Data);
-
-                lock (_processLock)
-                {
-                    _activeProcess = process;
-                }
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
+                var result = await _processRunner.RunAsync(
+                    new ProcessStartSpec
+                    {
+                        FileName = run.Config.PythonPath,
+                        Arguments = arguments,
+                        WorkingDirectory = run.RunRoot,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8,
+                        EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["PYTHONIOENCODING"] = "utf-8",
+                            ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+                        }
+                    },
+                    line => HandleTrainingOutput(run, line),
+                    cancellationToken);
 
                 var wasStopped = false;
                 lock (_processLock)
                 {
-                    wasStopped = _stopRequested && _activeRunId == run.Id;
-                    _activeProcess = null;
-                    _activeRunId = "";
-                    _stopRequested = false;
+                    wasStopped = result.WasCanceled || (_stopRequested && _activeRunId == run.Id);
                 }
 
                 if (wasStopped)
@@ -1000,21 +1010,32 @@ namespace Insight.Services.Industrial
                     return;
                 }
 
-                if (process.ExitCode != 0)
+                if (!result.Succeeded)
                 {
-                    FailRun(run, $"训练进程退出码: {process.ExitCode}。请检查 Python 环境、ultralytics 安装、GPU device 和数据路径。");
+                    var exitCode = result.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown";
+                    FailRun(run, $"训练进程退出码: {exitCode}。请检查 Python 环境、ultralytics 安装、GPU device 和数据路径。");
                     return;
                 }
 
-                CompleteRun(run, dataset);
+                await CompleteRunAsync(run, dataset, cancellationToken);
             }
             catch (Exception ex)
             {
-                FailRun(run, ex.Message);
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    MarkRunStopped(run);
+                }
+                else
+                {
+                    FailRun(run, ex.Message);
+                }
             }
         }
 
-        private void CompleteRun(TrainingRunRecord run, DatasetVersion dataset)
+        private async Task CompleteRunAsync(
+            TrainingRunRecord run,
+            DatasetVersion dataset,
+            CancellationToken cancellationToken)
         {
             LoadMetricsFromResultsCsv(run);
             run.BestPtPath = FindArtifact(run.RunRoot, "best.pt");
@@ -1028,13 +1049,15 @@ namespace Insight.Services.Industrial
 
             run.Status = "Evaluating";
             UpsertRun(run.ProjectRoot, run);
+            TrySyncTrainingJob(run);
             var report = BuildEvaluationReport(run, dataset);
             run.EvaluationReportPath = Path.Combine(run.RunRoot, "evaluation_report.json");
             SaveJson(run.EvaluationReportPath, report);
 
             run.Status = "Exporting";
             UpsertRun(run.ProjectRoot, run);
-            run.OnnxPath = ExportOnnx(run);
+            TrySyncTrainingJob(run);
+            run.OnnxPath = await ExportOnnxAsync(run, cancellationToken);
 
             if (!string.IsNullOrWhiteSpace(run.OnnxPath))
             {
@@ -1049,39 +1072,36 @@ namespace Insight.Services.Industrial
             run.Status = "Completed";
             run.FinishedAt = DateTime.Now;
             UpsertRun(run.ProjectRoot, run);
+            TrySyncTrainingJob(run);
             _messenger.Send(new { action = "industrial_training_finished", success = true, run });
             _messenger.Log($"专业训练完成: {run.Id}", "success");
         }
 
-        private string ExportOnnx(TrainingRunRecord run)
+        private async Task<string> ExportOnnxAsync(TrainingRunRecord run, CancellationToken cancellationToken)
         {
             try
             {
                 AppendLog(run, "开始导出 ONNX。");
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = run.Config.PythonPath,
-                    Arguments = $"-c \"from ultralytics.cfg import entrypoint; entrypoint()\" export model={QuotePath(run.BestPtPath)} format=onnx imgsz={run.Config.ImgSize} simplify=True",
-                    WorkingDirectory = run.RunRoot,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8
-                };
-                process.StartInfo.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                process.OutputDataReceived += (_, e) => AppendLog(run, e.Data);
-                process.ErrorDataReceived += (_, e) => AppendLog(run, e.Data);
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-                process.WaitForExit();
+                var result = await _processRunner.RunAsync(
+                    new ProcessStartSpec
+                    {
+                        FileName = run.Config.PythonPath,
+                        Arguments = $"-c \"from ultralytics.cfg import entrypoint; entrypoint()\" export model={QuotePath(run.BestPtPath)} format=onnx imgsz={run.Config.ImgSize} simplify=True",
+                        WorkingDirectory = run.RunRoot,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8,
+                        EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["PYTHONIOENCODING"] = "utf-8"
+                        }
+                    },
+                    line => AppendLog(run, line),
+                    cancellationToken);
 
-                if (process.ExitCode != 0)
+                if (!result.Succeeded)
                 {
-                    AppendLog(run, $"ONNX 导出失败，退出码: {process.ExitCode}");
+                    var exitCode = result.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "unknown";
+                    AppendLog(run, $"ONNX 导出失败，退出码: {exitCode}");
                     return "";
                 }
 
@@ -1139,6 +1159,7 @@ namespace Insight.Services.Industrial
             run.FailureReason = reason;
             run.FinishedAt = DateTime.Now;
             UpsertRun(run.ProjectRoot, run);
+            TrySyncTrainingJob(run);
             AppendLog(run, "失败原因: " + reason);
             _messenger.Send(new { action = "industrial_training_finished", success = false, run });
             _messenger.Error($"专业训练失败: {reason}");
@@ -1151,22 +1172,67 @@ namespace Insight.Services.Industrial
             run.FailureReason = "用户停止训练。";
             run.FinishedAt = DateTime.Now;
             UpsertRun(run.ProjectRoot, run);
+            TrySyncTrainingJob(run);
             AppendLog(run, run.FailureReason);
             _messenger.Send(new { action = "industrial_training_finished", success = false, run });
             ClearActiveRun(run.Id);
         }
 
-        private void ReserveActiveRun(string runId)
+        private void TrySyncTrainingJob(TrainingRunRecord run)
+        {
+            try
+            {
+                var record = new TrainingJobRecord
+                {
+                    JobId = run.Id,
+                    ProviderId = LocalYoloTrainingProvider.ProviderId,
+                    State = MapTrainingRunState(run.Status),
+                    ProjectRoot = run.ProjectRoot,
+                    DatasetVersionId = run.DatasetVersionId,
+                    ExternalJobId = run.Id,
+                    ArtifactRoot = string.IsNullOrWhiteSpace(run.OnnxPath) ? run.RunRoot : run.OnnxPath,
+                    FailureReason = run.FailureReason,
+                    Metadata =
+                    {
+                        ["experimentName"] = run.ExperimentName,
+                        ["runRoot"] = run.RunRoot,
+                        ["status"] = run.Status
+                    }
+                };
+
+                _jobStore.UpsertAsync(record, CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _messenger.Log($"同步训练任务状态失败: {ex.Message}", "warning");
+            }
+        }
+
+        private static TrainingProviderJobState MapTrainingRunState(string status)
+        {
+            return status switch
+            {
+                "Completed" => TrainingProviderJobState.Completed,
+                "Failed" => TrainingProviderJobState.Failed,
+                "Stopped" => TrainingProviderJobState.Stopped,
+                "Running" or "Evaluating" or "Exporting" => TrainingProviderJobState.Running,
+                _ => TrainingProviderJobState.Queued
+            };
+        }
+
+        private CancellationToken ReserveActiveRun(string runId)
         {
             lock (_processLock)
             {
-                if (!string.IsNullOrWhiteSpace(_activeRunId) || (_activeProcess != null && !_activeProcess.HasExited))
+                if (!string.IsNullOrWhiteSpace(_activeRunId) || _activeRunCts != null)
                 {
                     throw new InvalidOperationException($"已有专业训练运行中: {_activeRunId}。请先停止或等待完成。");
                 }
 
+                _activeRunCts = new CancellationTokenSource();
                 _activeRunId = runId;
                 _stopRequested = false;
+                return _activeRunCts.Token;
             }
         }
 
@@ -1183,7 +1249,8 @@ namespace Insight.Services.Industrial
             lock (_processLock)
             {
                 if (_activeRunId != runId) return;
-                _activeProcess = null;
+                _activeRunCts?.Dispose();
+                _activeRunCts = null;
                 _activeRunId = "";
                 _stopRequested = false;
             }
