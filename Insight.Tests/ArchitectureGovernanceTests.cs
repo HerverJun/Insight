@@ -85,6 +85,16 @@ public class ArchitectureGovernanceTests
     }
 
     [Fact]
+    public void KaggleCredentialPayloadRequiresUsernameAndApiKey()
+    {
+        using var invalid = JsonDocument.Parse("""{"kaggleUsername":"tester"}""");
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => WebViewPayloadBinder.Bind<SaveKaggleCredentialsPayload>(invalid.RootElement));
+
+        Assert.Contains(nameof(SaveKaggleCredentialsPayload.ApiKey), ex.Message);
+    }
+
+    [Fact]
     public async Task SystemProcessRunnerStreamsOutputAndReturnsExitCode()
     {
         var runner = new SystemProcessRunner();
@@ -198,9 +208,73 @@ public class ArchitectureGovernanceTests
 
             Assert.Equal(TrainingProviderJobState.Completed, result.State);
             Assert.Equal("tester/surface-kernel", result.Metadata["kernelId"]);
+            Assert.True(File.Exists(result.Metadata["artifactManifestPath"]));
+            Assert.False(string.IsNullOrWhiteSpace(result.Metadata["bestPtSha256"]));
+            Assert.False(string.IsNullOrWhiteSpace(result.Metadata["onnxSha256"]));
             Assert.Contains(result.Artifacts, x => x.Format == "pt" && Path.GetFileName(x.Path) == "best.pt");
             Assert.Contains(result.Artifacts, x => x.Format == "onnx" && Path.GetExtension(x.Path) == ".onnx");
+            Assert.Contains(result.Artifacts, x => x.Format == "manifest");
             Assert.Contains(observer.Logs, x => x.Contains("Kaggle kernel status"));
+        }
+        finally
+        {
+            DeleteTempDirectory(workDir);
+        }
+    }
+
+    [Fact]
+    public async Task KaggleYoloProviderFailsWhenDownloadedOutputHasNoReportArtifact()
+    {
+        var workDir = CreateTempDirectory();
+        try
+        {
+            var datasetDir = Path.Combine(workDir, "dataset");
+            Directory.CreateDirectory(datasetDir);
+            var provider = new KaggleYoloTrainingProvider(new FakeKaggleClient(Path.Combine(workDir, "output"), includeReport: false));
+
+            var result = await provider.StartAsync(
+                CreateKaggleProviderRequest(workDir, datasetDir),
+                new RecordingTrainingObserver(),
+                CancellationToken.None);
+
+            Assert.Equal(TrainingProviderJobState.Failed, result.State);
+            Assert.Contains("metrics or report", result.FailureReason);
+        }
+        finally
+        {
+            DeleteTempDirectory(workDir);
+        }
+    }
+
+    [Fact]
+    public async Task KaggleYoloProviderTimesOutQueuedKernel()
+    {
+        var workDir = CreateTempDirectory();
+        try
+        {
+            var datasetDir = Path.Combine(workDir, "dataset");
+            Directory.CreateDirectory(datasetDir);
+            var provider = new KaggleYoloTrainingProvider(
+                new FakeKaggleClient(
+                    Path.Combine(workDir, "output"),
+                    status: new KaggleTrainingJobStatus
+                    {
+                        KernelId = "tester/surface-kernel",
+                        State = "Queued",
+                        KernelState = KaggleKernelState.Queued,
+                        Message = "queued"
+                    }));
+
+            var request = CreateKaggleProviderRequest(workDir, datasetDir);
+            request.ProviderOptions["pollTimeoutMinutes"] = "0";
+
+            var result = await provider.StartAsync(
+                request,
+                new RecordingTrainingObserver(),
+                CancellationToken.None);
+
+            Assert.Equal(TrainingProviderJobState.Failed, result.State);
+            Assert.Contains("timeout", result.FailureReason, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -278,6 +352,35 @@ public class ArchitectureGovernanceTests
         }
     }
 
+    private static TrainingProviderJobRequest CreateKaggleProviderRequest(string workDir, string datasetDir)
+    {
+        return new TrainingProviderJobRequest
+        {
+            JobId = "run_cloud",
+            ProjectRoot = workDir,
+            DatasetVersionId = "ds_1",
+            WorkDir = workDir,
+            Params = new TrainingParams
+            {
+                ModelSize = "v8s",
+                Epochs = 1,
+                BatchSize = 1,
+                Classes = new List<string> { "scratch" }
+            },
+            ProviderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["projectName"] = "Surface QA",
+                ["kaggleUsername"] = "tester",
+                ["datasetSlug"] = "surface-ds",
+                ["kernelSlug"] = "surface-kernel",
+                ["datasetDirectory"] = datasetDir,
+                ["outputDirectory"] = Path.Combine(workDir, "output"),
+                ["pollIntervalSeconds"] = "0",
+                ["pollTimeoutMinutes"] = "1"
+            }
+        };
+    }
+
     private sealed class SelectFolderPayload
     {
         public string Type { get; set; } = "";
@@ -352,15 +455,40 @@ public class ArchitectureGovernanceTests
                 State = TrainingProviderJobState.Completed
             });
         }
+
+        public Task<TrainingProviderJobResult> RecoverAsync(
+            TrainingProviderJobRequest request,
+            ITrainingJobObserver observer,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new TrainingProviderJobResult
+            {
+                JobId = request.JobId,
+                State = TrainingProviderJobState.Failed
+            });
+        }
     }
 
     private sealed class FakeKaggleClient : IKaggleClient
     {
         private readonly string _outputDir;
+        private readonly bool _includeReport;
+        private readonly KaggleTrainingJobStatus _status;
 
-        public FakeKaggleClient(string outputDir)
+        public FakeKaggleClient(
+            string outputDir,
+            bool includeReport = true,
+            KaggleTrainingJobStatus? status = null)
         {
             _outputDir = outputDir;
+            _includeReport = includeReport;
+            _status = status ?? new KaggleTrainingJobStatus
+            {
+                KernelId = "tester/surface-kernel",
+                State = "Completed",
+                KernelState = KaggleKernelState.Completed,
+                Message = "complete"
+            };
         }
 
         public Task<KaggleConnectionTestResult> TestConnectionAsync(
@@ -395,12 +523,7 @@ public class ArchitectureGovernanceTests
             string kernelId,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult(new KaggleTrainingJobStatus
-            {
-                KernelId = kernelId,
-                State = "Completed",
-                Message = "complete"
-            });
+            return Task.FromResult(_status);
         }
 
         public Task<string> DownloadOutputAsync(
@@ -410,7 +533,10 @@ public class ArchitectureGovernanceTests
             Directory.CreateDirectory(Path.Combine(_outputDir, "weights"));
             File.WriteAllText(Path.Combine(_outputDir, "weights", "best.pt"), "best");
             File.WriteAllBytes(Path.Combine(_outputDir, "detector.onnx"), new byte[] { 1, 2, 3, 4 });
-            File.WriteAllText(Path.Combine(_outputDir, "results.csv"), "epoch,metrics/mAP50(B)\n1,0.9\n");
+            if (_includeReport)
+            {
+                File.WriteAllText(Path.Combine(_outputDir, "results.csv"), "epoch,metrics/mAP50(B)\n1,0.9\n");
+            }
             return Task.FromResult(_outputDir);
         }
     }

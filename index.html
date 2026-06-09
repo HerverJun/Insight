@@ -1832,6 +1832,10 @@
                                 <input id="industrialKaggleUsername" class="form-control" placeholder="kaggle user">
                             </div>
                             <div class="form-group">
+                                <label class="form-label">API Key</label>
+                                <input id="industrialKaggleApiKey" type="password" class="form-control" placeholder="stored securely">
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">Dataset Slug</label>
                                 <input id="industrialKaggleDatasetSlug" class="form-control" placeholder="surface-dataset">
                             </div>
@@ -1840,8 +1844,15 @@
                                 <input id="industrialKaggleKernelSlug" class="form-control" placeholder="surface-training">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Kaggle</label>
+                                <label class="form-label">Connection</label>
                                 <button class="btn btn-secondary" onclick="testIndustrialKaggleConnection()" style="width:100%;">Test Connection</button>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Credentials</label>
+                                <div style="display:flex;gap:6px;">
+                                    <button class="btn btn-secondary" onclick="saveIndustrialKaggleCredentials()" style="flex:1;">Save</button>
+                                    <button class="btn btn-secondary" onclick="deleteIndustrialKaggleCredentials()" style="flex:1;">Delete</button>
+                                </div>
                             </div>
                         </div>
                         <div class="checklist-container" style="padding:0;background:#fff;margin-top:10px;">
@@ -1849,13 +1860,14 @@
                                 <thead>
                                     <tr>
                                         <th>Run</th>
+                                        <th style="width:120px;">Provider</th>
                                         <th style="width:110px;">状态</th>
                                         <th style="width:120px;">mAP50</th>
                                         <th style="width:220px;">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody id="industrialRunBody">
-                                    <tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>
+                                    <tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -2848,7 +2860,28 @@
         function testIndustrialKaggleConnection() {
             window.chrome.webview.postMessage(JSON.stringify({
                 action: 'test_kaggle_connection',
-                kaggleUsername: (document.getElementById('industrialKaggleUsername')?.value || '').trim()
+                kaggleUsername: (document.getElementById('industrialKaggleUsername')?.value || '').trim(),
+                apiKey: (document.getElementById('industrialKaggleApiKey')?.value || '').trim()
+            }));
+        }
+
+        function saveIndustrialKaggleCredentials() {
+            const kaggleUsername = (document.getElementById('industrialKaggleUsername')?.value || '').trim();
+            const apiKey = (document.getElementById('industrialKaggleApiKey')?.value || '').trim();
+            if (!kaggleUsername || !apiKey) {
+                showMiniToast('warning', '缺少 Kaggle 凭据', '请填写 Username 和 API Key', 'warning');
+                return;
+            }
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'save_kaggle_credentials',
+                kaggleUsername,
+                apiKey
+            }));
+        }
+
+        function deleteIndustrialKaggleCredentials() {
+            window.chrome.webview.postMessage(JSON.stringify({
+                action: 'delete_kaggle_credentials'
             }));
         }
 
@@ -3063,17 +3096,23 @@
             if (!body) return;
             body.innerHTML = '';
             if (!industrialState.runs.length) {
-                body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#99a;padding:20px;">暂无实验</td></tr>';
                 return;
             }
             industrialState.runs.forEach(r => {
                 const id = r.Id || r.id;
                 const status = r.Status || r.status || '';
+                const providerId = r.ProviderId || r.providerId || 'local-yolo';
+                const providerMetadata = r.ProviderMetadata || r.providerMetadata || {};
+                const externalJobId = r.ProviderExternalJobId || r.providerExternalJobId || providerMetadata.kernelId || providerMetadata.KernelId || '';
+                const providerLabel = providerId === 'kaggle-yolo'
+                    ? `Kaggle${externalJobId ? `<div style="font-size:11px;color:var(--text-sub);margin-top:4px;">${escapeHtml(externalJobId)}</div>` : ''}`
+                    : 'Local';
                 const metrics = r.Metrics || r.metrics || [];
                 const lastMap = [...metrics].reverse().find(x => x.Map50 || x.map50);
                 const mapText = lastMap ? Number(lastMap.Map50 || lastMap.map50 || 0).toFixed(3) : '-';
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${escapeHtml(id)}</td><td>${renderIndustrialStatus(status)}</td><td>${mapText}</td><td>
+                tr.innerHTML = `<td>${escapeHtml(id)}</td><td>${providerLabel}</td><td>${renderIndustrialStatus(status)}</td><td>${mapText}</td><td>
                     <div class="industrial-action-row">
                     <button class="btn btn-secondary" onclick="loadIndustrialRunDetail('${id}')">详情</button>
                     <button class="btn btn-secondary" onclick="loadIndustrialEvaluation('${id}')">评估</button>
@@ -3222,8 +3261,20 @@
             }
 
             else if (data.action === 'kaggle_connection_tested') {
-                showMiniToast(data.success ? 'success' : 'error', data.success ? 'Kaggle 可用' : 'Kaggle 不可用', data.message || '', data.success ? 'success' : 'error');
-                addLog(data.message || (data.success ? 'Kaggle connection OK' : 'Kaggle connection failed'), data.success ? 'success' : 'error');
+                const kind = data.errorKind || '';
+                const message = data.message || (data.success ? 'Kaggle connection OK' : 'Kaggle connection failed');
+                showMiniToast(data.success ? 'success' : 'error', data.success ? 'Kaggle 可用' : `Kaggle 不可用 ${kind}`, message, data.success ? 'success' : 'error');
+                addLog(`${message}${kind ? ` [${kind}]` : ''}`, data.success ? 'success' : 'error');
+            }
+
+            else if (data.action === 'kaggle_credentials_saved') {
+                showMiniToast(data.success ? 'success' : 'error', data.success ? '凭据已保存' : '凭据保存失败', data.username || data.message || '', data.success ? 'success' : 'error');
+                const key = document.getElementById('industrialKaggleApiKey');
+                if (data.success && key) key.value = '';
+            }
+
+            else if (data.action === 'kaggle_credentials_deleted') {
+                showMiniToast(data.success ? 'success' : 'error', data.success ? '凭据已删除' : '凭据删除失败', data.message || '', data.success ? 'success' : 'error');
             }
 
             else if (data.action === 'kaggle_training_started') {

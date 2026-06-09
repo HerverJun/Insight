@@ -23,6 +23,8 @@ namespace Insight.Bridge
             RunModelEvaluation,
             ExportModelPackage,
             ExportDatasetZip,
+            SaveKaggleCredentials,
+            DeleteKaggleCredentials,
             TestKaggleConnection,
             StartKaggleTraining,
             DownloadKaggleOutput,
@@ -73,6 +75,8 @@ namespace Insight.Bridge
         public const string RunModelEvaluation = "run_model_evaluation";
         public const string ExportModelPackage = "export_model_package";
         public const string ExportDatasetZip = "export_dataset_zip";
+        public const string SaveKaggleCredentials = "save_kaggle_credentials";
+        public const string DeleteKaggleCredentials = "delete_kaggle_credentials";
         public const string TestKaggleConnection = "test_kaggle_connection";
         public const string StartKaggleTraining = "start_kaggle_training";
         public const string DownloadKaggleOutput = "download_kaggle_output";

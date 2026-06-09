@@ -114,9 +114,29 @@ namespace Insight.Bridge
     public sealed class TestKaggleConnectionPayload : IWebViewPayload
     {
         public string KaggleUsername { get; set; } = "";
+        public string ApiKey { get; set; } = "";
 
         public void Validate()
         {
+        }
+    }
+
+    public sealed class SaveKaggleCredentialsPayload : IWebViewPayload
+    {
+        public string KaggleUsername { get; set; } = "";
+        public string ApiKey { get; set; } = "";
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(KaggleUsername))
+            {
+                throw new InvalidOperationException($"{nameof(KaggleUsername)} is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(ApiKey))
+            {
+                throw new InvalidOperationException($"{nameof(ApiKey)} is required.");
+            }
         }
     }
 

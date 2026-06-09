@@ -7,6 +7,10 @@ namespace Insight.Handlers
     {
         public CloudTrainingCommandHandler(InsightApplication app)
         {
+            Map(WebViewActions.SaveKaggleCredentials, (request, ct) =>
+                app.HandleSaveKaggleCredentialsAsync(WebViewPayloadBinder.Bind<SaveKaggleCredentialsPayload>(request.Payload), ct));
+            Map(WebViewActions.DeleteKaggleCredentials, (request, ct) =>
+                app.HandleDeleteKaggleCredentialsAsync(ct));
             Map(WebViewActions.TestKaggleConnection, (request, ct) =>
                 app.HandleTestKaggleConnectionAsync(WebViewPayloadBinder.Bind<TestKaggleConnectionPayload>(request.Payload), ct));
             Map(WebViewActions.StartKaggleTraining, (request, ct) =>

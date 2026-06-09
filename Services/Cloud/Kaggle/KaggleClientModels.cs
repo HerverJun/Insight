@@ -1,8 +1,38 @@
 namespace Insight.Services.Cloud.Kaggle
 {
+    public enum KaggleConnectionErrorKind
+    {
+        None,
+        CliUnavailable,
+        CredentialsMissing,
+        Unauthorized,
+        Network,
+        RateLimited,
+        Unknown
+    }
+
+    public enum KaggleKernelState
+    {
+        Unknown,
+        Submitted,
+        Queued,
+        Running,
+        Completed,
+        Failed,
+        Canceled,
+        TimedOut
+    }
+
+    public sealed class KaggleRetryPolicy
+    {
+        public int MaxAttempts { get; init; } = 3;
+        public int DelayMilliseconds { get; init; } = 500;
+    }
+
     public sealed class KaggleConnectionTestRequest
     {
         public string Username { get; init; } = "";
+        public string ApiKey { get; init; } = "";
         public Action<string, string>? OnLog { get; init; }
     }
 
@@ -11,6 +41,7 @@ namespace Insight.Services.Cloud.Kaggle
         public bool Success { get; init; }
         public string CliVersion { get; init; } = "";
         public string Message { get; init; } = "";
+        public KaggleConnectionErrorKind ErrorKind { get; init; }
     }
 
     public sealed class KaggleTrainingSubmissionRequest
@@ -23,6 +54,7 @@ namespace Insight.Services.Cloud.Kaggle
         public global::Insight.KaggleCloudTrainingOptions Options { get; init; } = new();
         public Action<string, string>? OnLog { get; init; }
         public Action<int>? OnProgress { get; init; }
+        public KaggleRetryPolicy RetryPolicy { get; init; } = new();
         public Dictionary<string, string> Metadata { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -47,6 +79,7 @@ namespace Insight.Services.Cloud.Kaggle
         public IReadOnlyList<string> Classes { get; init; } = Array.Empty<string>();
         public Action<string, string>? OnLog { get; init; }
         public Action<int>? OnProgress { get; init; }
+        public KaggleRetryPolicy RetryPolicy { get; init; } = new();
         public Dictionary<string, string> Metadata { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -67,8 +100,13 @@ namespace Insight.Services.Cloud.Kaggle
     {
         public string KernelId { get; init; } = "";
         public string State { get; init; } = "";
+        public KaggleKernelState KernelState { get; init; } = KaggleKernelState.Unknown;
         public double Progress { get; init; }
         public string Message { get; init; } = "";
+        public bool IsTerminal => KernelState is KaggleKernelState.Completed or
+            KaggleKernelState.Failed or
+            KaggleKernelState.Canceled or
+            KaggleKernelState.TimedOut;
     }
 
     public sealed class KaggleOutputDownloadRequest
@@ -76,5 +114,23 @@ namespace Insight.Services.Cloud.Kaggle
         public string KernelId { get; init; } = "";
         public string OutputDirectory { get; init; } = "";
         public Action<string, string>? OnLog { get; init; }
+    }
+
+    public sealed class KaggleArtifactManifest
+    {
+        public string JobId { get; set; } = "";
+        public string KernelId { get; set; } = "";
+        public string OutputDirectory { get; set; } = "";
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        public List<KaggleArtifactManifestItem> Artifacts { get; set; } = new();
+    }
+
+    public sealed class KaggleArtifactManifestItem
+    {
+        public string Path { get; set; } = "";
+        public string RelativePath { get; set; } = "";
+        public string Format { get; set; } = "";
+        public long Length { get; set; }
+        public string Sha256 { get; set; } = "";
     }
 }

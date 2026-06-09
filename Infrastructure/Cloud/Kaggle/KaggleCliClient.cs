@@ -1,6 +1,7 @@
 using Insight.Infrastructure.Processes;
 using Insight.Services.Cloud.Kaggle;
 using Insight.Services.Configuration;
+using Insight.Services.Security;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -17,11 +18,21 @@ namespace Insight.Infrastructure.Cloud.Kaggle
 
         private readonly IProcessRunner _processRunner;
         private readonly InsightAppPaths _paths;
+        private readonly KaggleCredentialStore? _credentialStore;
 
         public KaggleCliClient(IProcessRunner processRunner, InsightAppPaths paths)
+            : this(processRunner, paths, null)
+        {
+        }
+
+        public KaggleCliClient(
+            IProcessRunner processRunner,
+            InsightAppPaths paths,
+            ISecretsStore? secretsStore)
         {
             _processRunner = processRunner;
             _paths = paths;
+            _credentialStore = secretsStore == null ? null : new KaggleCredentialStore(secretsStore);
         }
 
         public async Task<KaggleConnectionTestResult> TestConnectionAsync(
@@ -29,23 +40,27 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             CancellationToken cancellationToken)
         {
             Directory.CreateDirectory(_paths.CloudJobsRoot);
+            var credential = await ResolveCredentialAsync(request.Username, request.ApiKey, cancellationToken);
             var versionLines = new List<string>();
             var version = await RunKaggleAsync(
                 new[] { "--version" },
                 _paths.CloudJobsRoot,
                 versionLines.Add,
+                credential,
+                new KaggleRetryPolicy { MaxAttempts = 1 },
                 cancellationToken);
 
             if (!version.Succeeded)
             {
                 var message = string.IsNullOrWhiteSpace(version.Output)
                     ? "Kaggle CLI is not available or failed to start."
-                    : version.Output;
+                    : SensitiveLogSanitizer.Sanitize(version.Output);
                 request.OnLog?.Invoke(message, "error");
                 return new KaggleConnectionTestResult
                 {
                     Success = false,
-                    Message = message
+                    Message = message,
+                    ErrorKind = ClassifyConnectionError(message, cliCommandFailed: true)
                 };
             }
 
@@ -55,6 +70,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 new[] { "datasets", "list", "-s", search, "-p", "1" },
                 _paths.CloudJobsRoot,
                 authLines.Add,
+                credential,
+                new KaggleRetryPolicy { MaxAttempts = 1 },
                 cancellationToken);
 
             var cliVersion = string.Join(Environment.NewLine, versionLines).Trim();
@@ -62,13 +79,14 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             {
                 var message = string.IsNullOrWhiteSpace(auth.Output)
                     ? "Kaggle credentials could not be verified."
-                    : auth.Output;
+                    : SensitiveLogSanitizer.Sanitize(auth.Output);
                 request.OnLog?.Invoke(message, "error");
                 return new KaggleConnectionTestResult
                 {
                     Success = false,
                     CliVersion = cliVersion,
-                    Message = message
+                    Message = message,
+                    ErrorKind = ClassifyConnectionError(message, cliCommandFailed: false)
                 };
             }
 
@@ -80,7 +98,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             {
                 Success = true,
                 CliVersion = cliVersion,
-                Message = ok
+                Message = ok,
+                ErrorKind = KaggleConnectionErrorKind.None
             };
         }
 
@@ -120,14 +139,35 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             var datasetId = $"{username}/{datasetSlug}";
             var kernelId = $"{username}/{kernelSlug}";
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-            var jobRoot = Path.Combine(_paths.CloudJobsRoot, "kaggle", $"{datasetSlug}_{timestamp}_{request.JobId}");
+            var jobRoot = Path.Combine(_paths.CloudJobsRoot, "kaggle", $"{datasetSlug}_{request.JobId}");
             var datasetDir = Path.Combine(jobRoot, "dataset");
             var kernelDir = Path.Combine(jobRoot, "kernel");
+            var submissionPath = Path.Combine(jobRoot, "submission-result.json");
+            var credential = await ResolveCredentialAsync(request.KaggleUsername, "", cancellationToken);
 
             Directory.CreateDirectory(datasetDir);
             Directory.CreateDirectory(kernelDir);
 
+            if (File.Exists(submissionPath))
+            {
+                var existing = JsonSerializer.Deserialize<KaggleTrainingSubmissionResult>(
+                    await File.ReadAllTextAsync(submissionPath, cancellationToken),
+                    JsonOptions);
+                if (existing != null &&
+                    string.Equals(existing.KernelId, kernelId, StringComparison.OrdinalIgnoreCase))
+                {
+                    request.OnLog?.Invoke($"Reusing existing Kaggle submission for job {request.JobId}: {kernelId}", "info");
+                    return existing;
+                }
+            }
+
             request.OnLog?.Invoke("Staging Kaggle dataset from the selected data version...", "info");
+            if (Directory.Exists(datasetDir))
+            {
+                Directory.Delete(datasetDir, recursive: true);
+            }
+
+            Directory.CreateDirectory(datasetDir);
             CopyDirectory(request.DatasetDirectory, datasetDir);
             WriteKaggleDataYaml(Path.Combine(datasetDir, "data.yaml"), request.Classes);
             WriteTrainingConfig(datasetDir, request);
@@ -139,6 +179,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 new[] { "datasets", "create", "-p", datasetDir, "--dir-mode", "zip", "-q" },
                 datasetDir,
                 line => request.OnLog?.Invoke(line, "info"),
+                credential,
+                request.RetryPolicy,
                 cancellationToken);
 
             if (!create.Succeeded)
@@ -148,6 +190,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                     new[] { "datasets", "version", "-p", datasetDir, "-m", $"Insight upload {timestamp}", "--dir-mode", "zip", "-q" },
                     datasetDir,
                     line => request.OnLog?.Invoke(line, "info"),
+                    credential,
+                    request.RetryPolicy,
                     cancellationToken);
                 if (!version.Succeeded)
                 {
@@ -162,6 +206,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 new[] { "kernels", "push", "-p", kernelDir },
                 kernelDir,
                 line => request.OnLog?.Invoke(line, "info"),
+                credential,
+                request.RetryPolicy,
                 cancellationToken);
 
             if (!push.Succeeded)
@@ -174,10 +220,12 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 new[] { "kernels", "status", kernelId },
                 kernelDir,
                 line => request.OnLog?.Invoke(line, "info"),
+                credential,
+                request.RetryPolicy,
                 cancellationToken);
 
             request.OnProgress?.Invoke(100);
-            return new KaggleTrainingSubmissionResult
+            var result = new KaggleTrainingSubmissionResult
             {
                 JobId = request.JobId,
                 DatasetId = datasetId,
@@ -189,6 +237,11 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 Submitted = true,
                 Message = "Kaggle training submitted."
             };
+            await File.WriteAllTextAsync(
+                submissionPath,
+                JsonSerializer.Serialize(result, JsonOptions),
+                cancellationToken);
+            return result;
         }
 
         public async Task<KaggleTrainingJobStatus> GetTrainingStatusAsync(
@@ -205,6 +258,8 @@ namespace Insight.Infrastructure.Cloud.Kaggle
                 new[] { "kernels", "status", kernelId },
                 _paths.CloudJobsRoot,
                 output.Add,
+                await ResolveCredentialAsync("", "", cancellationToken),
+                new KaggleRetryPolicy(),
                 cancellationToken);
 
             var message = string.Join(Environment.NewLine, output);
@@ -212,47 +267,156 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             return new KaggleTrainingJobStatus
             {
                 KernelId = kernelId,
-                State = state,
+                State = state.ToString(),
+                KernelState = state,
                 Progress = StateProgress(state),
                 Message = message
             };
         }
 
-        public Task<string> DownloadOutputAsync(
+        public async Task<string> DownloadOutputAsync(
             KaggleOutputDownloadRequest request,
             CancellationToken cancellationToken)
         {
-            return KaggleCloudTrainer.DownloadOutputAsync(
-                request.KernelId,
-                request.OutputDirectory,
-                request.OnLog,
-                _processRunner,
-                _paths,
+            if (string.IsNullOrWhiteSpace(request.KernelId) || !request.KernelId.Contains('/'))
+            {
+                throw new ArgumentException("Kernel ID must use username/kernel-slug format.", nameof(request));
+            }
+
+            var outputDir = request.OutputDirectory;
+            if (string.IsNullOrWhiteSpace(outputDir))
+            {
+                outputDir = Path.Combine(_paths.CloudJobsRoot, "kaggle-outputs", Slugify(request.KernelId.Replace('/', '-')));
+            }
+
+            Directory.CreateDirectory(outputDir);
+            request.OnLog?.Invoke($"Downloading Kaggle output: {request.KernelId}", "info");
+            var result = await RunKaggleAsync(
+                new[] { "kernels", "output", request.KernelId, "-p", outputDir },
+                outputDir,
+                line => request.OnLog?.Invoke(line, "info"),
+                await ResolveCredentialAsync("", "", cancellationToken),
+                new KaggleRetryPolicy(),
                 cancellationToken);
+
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException($"Kaggle output download failed: {SensitiveLogSanitizer.Sanitize(result.Output)}");
+            }
+
+            request.OnLog?.Invoke($"Kaggle output saved: {outputDir}", "success");
+            return outputDir;
         }
 
         private async Task<ProcessRunResult> RunKaggleAsync(
             IReadOnlyList<string> args,
             string workingDirectory,
             Action<string>? onOutput,
+            KaggleCredential? credential,
+            KaggleRetryPolicy retryPolicy,
             CancellationToken cancellationToken)
         {
             Directory.CreateDirectory(workingDirectory);
-            return await _processRunner.RunAsync(
-                new ProcessStartSpec
+            var attempts = Math.Max(1, retryPolicy.MaxAttempts);
+            var delay = Math.Max(0, retryPolicy.DelayMilliseconds);
+            ProcessRunResult? lastResult = null;
+            Exception? lastException = null;
+
+            for (var attempt = 1; attempt <= attempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
                 {
-                    FileName = "kaggle",
-                    ArgumentList = args.ToArray(),
-                    WorkingDirectory = workingDirectory,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                    EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    var result = await _processRunner.RunAsync(
+                        CreateKaggleSpec(args, workingDirectory, credential),
+                        line => onOutput?.Invoke(SensitiveLogSanitizer.Sanitize(line)),
+                        cancellationToken);
+                    lastResult = new ProcessRunResult(
+                        result.ExitCode,
+                        result.WasCanceled,
+                        SensitiveLogSanitizer.Sanitize(result.Output));
+                    if (lastResult.Succeeded || !IsRetryableFailure(lastResult.Output))
                     {
-                        ["PYTHONIOENCODING"] = "utf-8"
+                        return lastResult;
                     }
-                },
-                onOutput,
-                cancellationToken);
+                }
+                catch (Exception ex) when (attempt < attempts && IsRetryableException(ex))
+                {
+                    lastException = ex;
+                }
+
+                if (attempt < attempts && delay > 0)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delay * attempt), cancellationToken);
+                }
+            }
+
+            if (lastResult != null)
+            {
+                return lastResult;
+            }
+
+            return new ProcessRunResult(
+                exitCode: null,
+                wasCanceled: cancellationToken.IsCancellationRequested,
+                output: SensitiveLogSanitizer.Sanitize(lastException?.Message ?? "Kaggle CLI failed to start."));
+        }
+
+        private static ProcessStartSpec CreateKaggleSpec(
+            IReadOnlyList<string> args,
+            string workingDirectory,
+            KaggleCredential? credential)
+        {
+            var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["PYTHONIOENCODING"] = "utf-8"
+            };
+
+            if (credential?.IsComplete == true)
+            {
+                env["KAGGLE_USERNAME"] = credential.Username;
+                env["KAGGLE_KEY"] = credential.Key;
+            }
+
+            return new ProcessStartSpec
+            {
+                FileName = "kaggle",
+                ArgumentList = args.ToArray(),
+                WorkingDirectory = workingDirectory,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+                EnvironmentVariables = env
+            };
+        }
+
+        private async Task<KaggleCredential?> ResolveCredentialAsync(
+            string username,
+            string apiKey,
+            CancellationToken cancellationToken)
+        {
+            if (!string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(apiKey))
+            {
+                return new KaggleCredential { Username = username.Trim(), Key = apiKey.Trim() };
+            }
+
+            if (_credentialStore == null)
+            {
+                return null;
+            }
+
+            var credential = await _credentialStore.GetAsync(cancellationToken);
+            if (credential?.IsComplete != true)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(username) &&
+                !credential.Username.Equals(username.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return credential;
         }
 
         private static void ValidatePreparedSubmission(KagglePreparedTrainingSubmissionRequest request)
@@ -433,28 +597,88 @@ namespace Insight.Infrastructure.Cloud.Kaggle
             return (family, string.IsNullOrWhiteSpace(size) ? "s" : size);
         }
 
-        private static string ParseKernelState(string message, bool commandSucceeded)
+        private static KaggleKernelState ParseKernelState(string message, bool commandSucceeded)
         {
-            if (!commandSucceeded) return "Unknown";
+            if (!commandSucceeded) return KaggleKernelState.Unknown;
             var text = message.ToLowerInvariant();
-            if (Regex.IsMatch(text, "\\b(complete|completed|success|succeeded)\\b")) return "Completed";
-            if (Regex.IsMatch(text, "\\b(error|failed|failure|cancelled|canceled)\\b")) return "Failed";
-            if (Regex.IsMatch(text, "\\b(running|executing)\\b")) return "Running";
-            if (Regex.IsMatch(text, "\\b(queued|pending)\\b")) return "Queued";
-            return "Submitted";
+            if (Regex.IsMatch(text, "\\b(complete|completed|success|succeeded)\\b")) return KaggleKernelState.Completed;
+            if (Regex.IsMatch(text, "\\b(cancelled|canceled)\\b")) return KaggleKernelState.Canceled;
+            if (Regex.IsMatch(text, "\\b(error|failed|failure)\\b")) return KaggleKernelState.Failed;
+            if (Regex.IsMatch(text, "\\b(running|executing)\\b")) return KaggleKernelState.Running;
+            if (Regex.IsMatch(text, "\\b(queued|pending)\\b")) return KaggleKernelState.Queued;
+            return KaggleKernelState.Submitted;
         }
 
-        private static double StateProgress(string state)
+        private static double StateProgress(KaggleKernelState state)
         {
             return state switch
             {
-                "Completed" => 1,
-                "Failed" => 1,
-                "Running" => 0.7,
-                "Queued" => 0.2,
-                "Submitted" => 0.4,
+                KaggleKernelState.Completed => 1,
+                KaggleKernelState.Failed => 1,
+                KaggleKernelState.Canceled => 1,
+                KaggleKernelState.TimedOut => 1,
+                KaggleKernelState.Running => 0.7,
+                KaggleKernelState.Queued => 0.2,
+                KaggleKernelState.Submitted => 0.4,
                 _ => 0
             };
+        }
+
+        private static KaggleConnectionErrorKind ClassifyConnectionError(
+            string message,
+            bool cliCommandFailed)
+        {
+            var text = (message ?? "").ToLowerInvariant();
+            if (cliCommandFailed)
+            {
+                return KaggleConnectionErrorKind.CliUnavailable;
+            }
+
+            if (text.Contains("kaggle.json", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("kaggle_username", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("credentials", StringComparison.OrdinalIgnoreCase))
+            {
+                return KaggleConnectionErrorKind.CredentialsMissing;
+            }
+
+            if (text.Contains("401", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("403", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("forbidden", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("invalid api", StringComparison.OrdinalIgnoreCase))
+            {
+                return KaggleConnectionErrorKind.Unauthorized;
+            }
+
+            if (text.Contains("429", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("too many requests", StringComparison.OrdinalIgnoreCase))
+            {
+                return KaggleConnectionErrorKind.RateLimited;
+            }
+
+            if (text.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("connection", StringComparison.OrdinalIgnoreCase))
+            {
+                return KaggleConnectionErrorKind.Network;
+            }
+
+            return KaggleConnectionErrorKind.Unknown;
+        }
+
+        private static bool IsRetryableFailure(string output)
+        {
+            var kind = ClassifyConnectionError(output, cliCommandFailed: false);
+            return kind is KaggleConnectionErrorKind.Network or KaggleConnectionErrorKind.RateLimited;
+        }
+
+        private static bool IsRetryableException(Exception ex)
+        {
+            return ex is IOException ||
+                ex is TimeoutException ||
+                ex is System.ComponentModel.Win32Exception;
         }
 
         private static string Slugify(string value)

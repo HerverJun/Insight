@@ -8,5 +8,10 @@ namespace Insight.Training.Providers
             TrainingProviderJobRequest request,
             ITrainingJobObserver observer,
             CancellationToken cancellationToken);
+
+        Task<TrainingProviderJobResult> RecoverAsync(
+            TrainingProviderJobRequest request,
+            ITrainingJobObserver observer,
+            CancellationToken cancellationToken);
     }
 }

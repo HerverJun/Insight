@@ -62,7 +62,7 @@ Provider outputs flow back through `IndustrialTrainingService`. The service rema
 - Local caches and WebView user data: `%LOCALAPPDATA%/Insight`
 - Cloud job staging and downloaded cloud artifacts: `%LOCALAPPDATA%/Insight/cloud-jobs`
 - Project-scoped durable artifacts: `<projectRoot>/.insight`
-- Secrets: never store tokens in project files; use a secrets abstraction before adding Kaggle API credentials.
+- Secrets: never store tokens in project files. Kaggle credentials are stored through `ProtectedFileSecretsStore` under the user config root using the current Windows user protection scope.
 
 ## Regression Gates
 
@@ -98,10 +98,35 @@ dotnet test Insight.sln -c Release --no-build --verbosity minimal
 
 The provider stages the existing dataset version directory rather than re-splitting raw sources. `KaggleCliClient.SubmitPreparedTrainingAsync` copies the selected `DatasetVersion.YoloRoot`, rewrites Kaggle-safe `data.yaml`, writes `training_config.json`, uploads the dataset with `--dir-mode zip`, writes kernel metadata with dataset attachment, pushes `YOLO_TRAIN_KaggleDataset.ipynb`, and returns dataset/kernel ids. After the kernel reaches a terminal state, provider output is downloaded into the run root, artifacts are discovered recursively, and the existing completion path registers the model and keeps evaluation/package flows unchanged.
 
+## Kaggle Provider v1.1
+
+Cloud state machine:
+
+- Connection test runs `kaggle --version` and an authenticated `datasets list`, returning `KaggleConnectionErrorKind` values for CLI unavailable, missing credentials, unauthorized, network, rate limit, and unknown failures.
+- Submission stages to a deterministic job root based on `jobId`, writes `submission-result.json`, and reuses that metadata for repeat submissions of the same job.
+- Dataset create/version, kernel push, status, and output download go through `IKaggleClient` and `IProcessRunner` with sanitized output and bounded retry for network/rate-limit failures.
+- Provider polling maps Kaggle CLI text into `KaggleKernelState`: Submitted, Queued, Running, Completed, Failed, Canceled, TimedOut, Unknown.
+- Timeout and terminal failure return failed provider results with diagnostic metadata; local cancellation marks the Insight run stopped but still does not remotely terminate an already-running Kaggle kernel.
+
+Failure recovery:
+
+- `ITrainingProvider.RecoverAsync` is the provider-owned recovery boundary.
+- `IndustrialTrainingService.HandleGetTrainingRuns` attempts recovery for persisted `kaggle-yolo` runs in Preparing, Running, Evaluating, or Exporting states.
+- Recovery rebuilds provider options from the stored run config plus `ProviderMetadata`, polls the persisted `kernelId`, downloads artifacts on completion, and then uses the normal evaluation/model-registration path.
+- Failed recovery marks the run and provider-neutral job failed with the recovery reason in the log and job record.
+
+Artifact trust boundary:
+
+- Kaggle output is untrusted until the provider writes and verifies `insight-kaggle-artifacts.json`.
+- The manifest records relative path, absolute path, format, length, and SHA-256 for discovered artifacts.
+- The provider requires `best.pt`, an ONNX artifact, and at least one metrics/report artifact before returning Completed.
+- `IndustrialTrainingService` verifies provider-supplied `bestPtSha256` and `onnxSha256` before registering a model.
+- Delivery package export still uses the project-scoped model registry copy, not arbitrary cloud output paths.
+
 ## Remaining Governance Backlog
 
 - Continue migrating dataset, project, SAM, and industrial-training WebView payload parsing from raw `JsonElement` to typed DTOs.
 - Split large application services by use case once the provider boundary is stable enough to avoid churn.
-- Replace placeholder secrets/artifact abstractions with concrete implementations before moving from Kaggle CLI credentials to direct Kaggle API-token based flows.
-- Add optional remote cancel/delete support when a Kaggle API adapter is available; v1 maps local cancellation to stopped run state but does not terminate an already-running Kaggle kernel remotely.
+- Add optional remote cancel/delete support when a Kaggle API adapter is available; v1.1 maps local cancellation to stopped run state but does not terminate an already-running Kaggle kernel remotely.
 - Add richer cloud progress parsing from Kaggle logs/results beyond coarse kernel state polling.
+- Add artifact manifest signing if cloud artifacts become part of regulated release evidence.

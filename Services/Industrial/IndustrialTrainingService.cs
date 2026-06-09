@@ -149,6 +149,7 @@ namespace Insight.Services.Industrial
             try
             {
                 var projectRoot = GetRequiredString(data, "projectRoot");
+                RecoverCloudTrainingRunsAsync(projectRoot, CancellationToken.None).GetAwaiter().GetResult();
                 var index = LoadIndex(projectRoot);
                 _messenger.Send(new
                 {
@@ -913,6 +914,97 @@ namespace Insight.Services.Industrial
             }
         }
 
+        public async Task RecoverCloudTrainingRunsAsync(
+            string projectRoot,
+            CancellationToken cancellationToken)
+        {
+            projectRoot = Path.GetFullPath(projectRoot);
+            var index = LoadIndex(projectRoot);
+            var recoverable = index.TrainingRuns
+                .Where(run => run.ProviderId == KaggleYoloTrainingProvider.ProviderId)
+                .Where(run => run.Status is "Preparing" or "Running" or "Evaluating" or "Exporting")
+                .OrderBy(x => x.CreatedAt)
+                .ToList();
+
+            if (recoverable.Count == 0)
+            {
+                return;
+            }
+
+            var provider = _providers.GetRequired(KaggleYoloTrainingProvider.ProviderId);
+            foreach (var run in recoverable)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var dataset = index.DatasetVersions.FirstOrDefault(x => x.Id == run.DatasetVersionId)
+                        ?? FindDatasetVersion(run.ProjectRoot, run.DatasetVersionId);
+                    var providerOptions = BuildProviderOptions(run, dataset, provider);
+                    foreach (var pair in run.ProviderMetadata)
+                    {
+                        providerOptions[pair.Key] = pair.Value;
+                    }
+
+                    run.Status = "Running";
+                    UpsertRun(run.ProjectRoot, run);
+                    TrySyncTrainingJob(run);
+
+                    var providerResult = await provider.RecoverAsync(
+                        new TrainingProviderJobRequest
+                        {
+                            JobId = run.Id,
+                            ProjectRoot = run.ProjectRoot,
+                            DatasetVersionId = run.DatasetVersionId,
+                            PythonPath = run.Config.PythonPath,
+                            WorkDir = run.RunRoot,
+                            Params = BuildTrainingParams(run.Config, dataset),
+                            ProviderOptions = providerOptions
+                        },
+                        new IndustrialTrainingJobObserver(this, run),
+                        cancellationToken);
+
+                    run.ProviderMetadata = providerResult.Metadata.Count == 0
+                        ? run.ProviderMetadata
+                        : providerResult.Metadata;
+                    if (run.ProviderMetadata.TryGetValue("kernelId", out var kernelId))
+                    {
+                        run.ProviderExternalJobId = kernelId;
+                    }
+
+                    ApplyProviderArtifacts(run, providerResult.Artifacts);
+                    if (string.IsNullOrWhiteSpace(run.BestPtPath))
+                    {
+                        run.BestPtPath = providerResult.ArtifactPath;
+                    }
+
+                    if (providerResult.State == TrainingProviderJobState.Completed)
+                    {
+                        await CompleteRunAsync(run, dataset, cancellationToken);
+                    }
+                    else if (providerResult.State == TrainingProviderJobState.Stopped)
+                    {
+                        MarkRunStopped(run);
+                    }
+                    else if (providerResult.State == TrainingProviderJobState.Failed)
+                    {
+                        FailRun(run, string.IsNullOrWhiteSpace(providerResult.FailureReason)
+                            ? "Recovered Kaggle job failed."
+                            : providerResult.FailureReason);
+                    }
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    run.Status = "Failed";
+                    run.FailureReason = $"Cloud job recovery failed: {ex.Message}";
+                    run.FinishedAt = DateTime.Now;
+                    UpsertRun(run.ProjectRoot, run);
+                    TrySyncTrainingJob(run);
+                    AppendLog(run, run.FailureReason);
+                    _messenger.Error(run.FailureReason);
+                }
+            }
+        }
+
         public ModelRegistryEntry PromoteModel(string projectRoot, string modelId, string status)
         {
             var index = LoadIndex(projectRoot);
@@ -1119,6 +1211,11 @@ namespace Insight.Services.Industrial
 
             if (!string.IsNullOrWhiteSpace(run.OnnxPath))
             {
+                if (!ValidateProviderArtifactChecksums(run))
+                {
+                    return;
+                }
+
                 RegisterModel(run, dataset);
             }
             else
@@ -1350,16 +1447,22 @@ namespace Insight.Services.Industrial
             DatasetVersion dataset,
             ITrainingProvider provider)
         {
-            var options = new Dictionary<string, string>(run.Config.ProviderOptions, StringComparer.OrdinalIgnoreCase)
+            var options = new Dictionary<string, string>(run.Config.ProviderOptions, StringComparer.OrdinalIgnoreCase);
+            options["projectName"] = string.IsNullOrWhiteSpace(dataset.ProjectName)
+                ? run.ExperimentName
+                : dataset.ProjectName;
+            options["datasetVersionId"] = dataset.Id;
+            options["datasetDirectory"] = dataset.YoloRoot;
+            options["runRoot"] = run.RunRoot;
+            options.TryAdd("outputDirectory", Path.Combine(run.RunRoot, "kaggle_output"));
+
+            foreach (var pair in run.ProviderMetadata)
             {
-                ["projectName"] = string.IsNullOrWhiteSpace(dataset.ProjectName)
-                    ? run.ExperimentName
-                    : dataset.ProjectName,
-                ["datasetVersionId"] = dataset.Id,
-                ["datasetDirectory"] = dataset.YoloRoot,
-                ["runRoot"] = run.RunRoot,
-                ["outputDirectory"] = Path.Combine(run.RunRoot, "kaggle_output")
-            };
+                if (!string.IsNullOrWhiteSpace(pair.Value))
+                {
+                    options.TryAdd(pair.Key, pair.Value);
+                }
+            }
 
             if (provider.Descriptor.Id == KaggleYoloTrainingProvider.ProviderId)
             {
@@ -1408,6 +1511,58 @@ namespace Insight.Services.Industrial
                     run.OnnxPath = artifact.Path;
                 }
             }
+        }
+
+        private bool ValidateProviderArtifactChecksums(TrainingRunRecord run)
+        {
+            if (run.ProviderId != KaggleYoloTrainingProvider.ProviderId)
+            {
+                return true;
+            }
+
+            if (!ValidateChecksum(run, run.BestPtPath, "bestPtSha256"))
+            {
+                return false;
+            }
+
+            if (!ValidateChecksum(run, run.OnnxPath, "onnxSha256"))
+            {
+                return false;
+            }
+
+            if (run.ProviderMetadata.TryGetValue("artifactManifestPath", out var manifestPath) &&
+                !string.IsNullOrWhiteSpace(manifestPath) &&
+                !File.Exists(manifestPath))
+            {
+                FailRun(run, $"Kaggle artifact manifest is missing: {manifestPath}");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ValidateChecksum(TrainingRunRecord run, string path, string metadataKey)
+        {
+            if (!run.ProviderMetadata.TryGetValue(metadataKey, out var expected) ||
+                string.IsNullOrWhiteSpace(expected))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                FailRun(run, $"Kaggle artifact checksum could not be verified because the file is missing: {metadataKey}");
+                return false;
+            }
+
+            var actual = ComputeSha256(path);
+            if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+            {
+                FailRun(run, $"Kaggle artifact checksum mismatch for {Path.GetFileName(path)}.");
+                return false;
+            }
+
+            return true;
         }
 
         private static string ResolveKaggleYoloVersion(string modelSize)

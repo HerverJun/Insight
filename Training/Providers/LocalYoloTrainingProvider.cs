@@ -88,6 +88,19 @@ namespace Insight.Training.Providers
             };
         }
 
+        public Task<TrainingProviderJobResult> RecoverAsync(
+            TrainingProviderJobRequest request,
+            ITrainingJobObserver observer,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new TrainingProviderJobResult
+            {
+                JobId = request.JobId,
+                State = TrainingProviderJobState.Failed,
+                FailureReason = "Local YOLO process jobs cannot be recovered after application restart."
+            });
+        }
+
         private TrainingLaunchPlan CreateLaunchPlan(TrainingProviderJobRequest request)
         {
             if (request.ProviderOptions.TryGetValue("arguments", out var arguments) &&

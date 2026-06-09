@@ -4,10 +4,12 @@ using System.Text.Json;
 using Insight.Bridge;
 using Insight.Infrastructure.Cloud.Kaggle;
 using Insight.Infrastructure.Processes;
+using Insight.Infrastructure.Security;
 using Insight.Infrastructure.Training;
 using Insight.Services.Cloud.Kaggle;
 using Insight.Services.Configuration;
 using Insight.Services.Industrial;
+using Insight.Services.Security;
 using Insight.Services.Training;
 using Insight.Training;
 using Insight.Training.Providers;
@@ -24,6 +26,7 @@ namespace Insight.Services
         private readonly InsightAppPaths _paths;
         private readonly IProcessRunner _processRunner;
         private readonly IKaggleClient _kaggleClient;
+        private readonly KaggleCredentialStore _kaggleCredentialStore;
         private readonly TrainingOrchestrator _training;
         private readonly IndustrialTrainingService _industrialTraining;
         private readonly SamLabelingService _samLabeling;
@@ -44,7 +47,7 @@ namespace Insight.Services
                 dialogs,
                 paths,
                 new SystemProcessRunner(),
-                new KaggleCliClient(new SystemProcessRunner(), paths))
+                new KaggleCliClient(new SystemProcessRunner(), paths, new ProtectedFileSecretsStore(paths)))
         {
         }
 
@@ -62,6 +65,7 @@ namespace Insight.Services
             _paths = paths;
             _processRunner = processRunner;
             _kaggleClient = kaggleClient;
+            _kaggleCredentialStore = new KaggleCredentialStore(new ProtectedFileSecretsStore(paths));
             _paths.EnsureUserRoots();
             _training = new TrainingOrchestrator(_messenger, new YoloTrainingEngine(), _processRunner, _paths);
             _industrialTraining = new IndustrialTrainingService(
@@ -557,6 +561,7 @@ namespace Insight.Services
                     new KaggleConnectionTestRequest
                     {
                         Username = payload.KaggleUsername,
+                        ApiKey = payload.ApiKey,
                         OnLog = (msg, type) => SendLog(msg, type)
                     },
                     cancellationToken);
@@ -566,6 +571,7 @@ namespace Insight.Services
                     action = "kaggle_connection_tested",
                     success = result.Success,
                     cliVersion = result.CliVersion,
+                    errorKind = result.ErrorKind.ToString(),
                     message = result.Message
                 });
 
@@ -578,6 +584,50 @@ namespace Insight.Services
             {
                 SendToFrontend(new { action = "kaggle_connection_tested", success = false, message = ex.Message });
                 SendError($"Kaggle connection test failed: {ex.Message}");
+            }
+        }
+
+        public async Task HandleSaveKaggleCredentialsAsync(
+            SaveKaggleCredentialsPayload payload,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await _kaggleCredentialStore.SaveAsync(
+                    new KaggleCredential
+                    {
+                        Username = payload.KaggleUsername,
+                        Key = payload.ApiKey
+                    },
+                    cancellationToken);
+
+                SendToFrontend(new
+                {
+                    action = "kaggle_credentials_saved",
+                    success = true,
+                    username = payload.KaggleUsername
+                });
+                SendLog($"Kaggle credentials saved for {payload.KaggleUsername}.", "success");
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "kaggle_credentials_saved", success = false, message = ex.Message });
+                SendError($"Failed to save Kaggle credentials: {ex.Message}");
+            }
+        }
+
+        public async Task HandleDeleteKaggleCredentialsAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await _kaggleCredentialStore.DeleteAsync(cancellationToken);
+                SendToFrontend(new { action = "kaggle_credentials_deleted", success = true });
+                SendLog("Kaggle credentials deleted.", "success");
+            }
+            catch (Exception ex)
+            {
+                SendToFrontend(new { action = "kaggle_credentials_deleted", success = false, message = ex.Message });
+                SendError($"Failed to delete Kaggle credentials: {ex.Message}");
             }
         }
 

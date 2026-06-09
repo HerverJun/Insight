@@ -260,6 +260,113 @@ public class IndustrialTrainingServiceTests
     }
 
     [Fact]
+    public async Task RecoverCloudTrainingRunAfterRestartPollsDownloadsAndRegistersModel()
+    {
+        var projectRoot = CreateTempDirectory();
+        try
+        {
+            var insightRoot = Path.Combine(projectRoot, ".insight");
+            Directory.CreateDirectory(insightRoot);
+            var yoloRoot = Path.Combine(insightRoot, "datasets", "ds_recover", "yolo");
+            Directory.CreateDirectory(Path.Combine(yoloRoot, "images", "train"));
+            Directory.CreateDirectory(Path.Combine(yoloRoot, "labels", "train"));
+            var dataYaml = Path.Combine(yoloRoot, "data.yaml");
+            File.WriteAllText(dataYaml, "train: images/train\nnames:\n  0: scratch\n", Encoding.UTF8);
+
+            var runRoot = Path.Combine(insightRoot, "runs", "run_recover");
+            Directory.CreateDirectory(runRoot);
+            var index = new IndustrialStoreIndex
+            {
+                DatasetVersions = new List<DatasetVersion>
+                {
+                    new()
+                    {
+                        Id = "ds_recover",
+                        ProjectRoot = projectRoot,
+                        ProjectName = "Surface QA",
+                        YoloRoot = yoloRoot,
+                        DataYamlPath = dataYaml,
+                        Classes = new List<string> { "scratch" }
+                    }
+                },
+                TrainingRuns = new List<TrainingRunRecord>
+                {
+                    new()
+                    {
+                        Id = "run_recover",
+                        ProjectRoot = projectRoot,
+                        DatasetVersionId = "ds_recover",
+                        ExperimentName = "Recovered Cloud Run",
+                        Status = "Running",
+                        RunRoot = runRoot,
+                        ProviderId = KaggleYoloTrainingProvider.ProviderId,
+                        ProviderExternalJobId = "tester/surface-kernel",
+                        ProviderMetadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["kernelId"] = "tester/surface-kernel",
+                            ["outputDirectory"] = Path.Combine(runRoot, "kaggle_output")
+                        },
+                        ConfigPath = Path.Combine(runRoot, "config.json"),
+                        EnvironmentPath = Path.Combine(runRoot, "environment.json"),
+                        LogPath = Path.Combine(runRoot, "train.log"),
+                        MetricsPath = Path.Combine(runRoot, "metrics.jsonl"),
+                        Config = new TrainingRunConfig
+                        {
+                            ProjectRoot = projectRoot,
+                            DatasetVersionId = "ds_recover",
+                            ProviderId = KaggleYoloTrainingProvider.ProviderId,
+                            PythonPath = "python",
+                            ModelSize = "v8s",
+                            Epochs = 1,
+                            BatchSize = 1,
+                            ImgSize = 64,
+                            ProviderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["kaggleUsername"] = "tester",
+                                ["datasetSlug"] = "surface-ds",
+                                ["kernelSlug"] = "surface-kernel",
+                                ["pollIntervalSeconds"] = "0",
+                                ["pollTimeoutMinutes"] = "1"
+                            }
+                        }
+                    }
+                }
+            };
+            File.WriteAllText(Path.Combine(insightRoot, "industrial_index.json"), JsonSerializer.Serialize(index, JsonOptions), Encoding.UTF8);
+
+            var runner = new IndustrialFakeProcessRunner();
+            var jobStore = new RecordingTrainingJobStore();
+            var service = new IndustrialTrainingService(
+                new RecordingFrontendMessenger(),
+                new YoloTrainingEngine(),
+                runner,
+                jobStore,
+                new ITrainingProvider[]
+                {
+                    new LocalYoloTrainingProvider(new YoloTrainingEngine(), runner),
+                    new KaggleYoloTrainingProvider(new IndustrialFakeKaggleClient())
+                });
+
+            await service.RecoverCloudTrainingRunsAsync(projectRoot, CancellationToken.None);
+
+            var persisted = JsonSerializer.Deserialize<IndustrialStoreIndex>(
+                File.ReadAllText(Path.Combine(insightRoot, "industrial_index.json"), Encoding.UTF8),
+                JsonOptions)!;
+            var run = Assert.Single(persisted.TrainingRuns);
+            Assert.Equal("Completed", run.Status);
+            Assert.True(File.Exists(run.BestPtPath));
+            Assert.True(File.Exists(run.OnnxPath));
+            Assert.Equal("tester/surface-kernel", run.ProviderExternalJobId);
+            Assert.Single(persisted.ModelRegistry);
+            Assert.Contains(jobStore.Records, x => x.JobId == "run_recover" && x.State == TrainingProviderJobState.Completed);
+        }
+        finally
+        {
+            DeleteTempDirectory(projectRoot);
+        }
+    }
+
+    [Fact]
     public void PromoteModelPinsProductionAndWritesModelCard()
     {
         var projectRoot = CreateTempDirectory();

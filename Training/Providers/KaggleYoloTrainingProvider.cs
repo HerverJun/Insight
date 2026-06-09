@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Insight.Services.Cloud.Kaggle;
 
 namespace Insight.Training.Providers
@@ -8,6 +10,10 @@ namespace Insight.Training.Providers
         public const string ProviderId = "kaggle-yolo";
 
         private readonly IKaggleClient _client;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            WriteIndented = true
+        };
 
         public KaggleYoloTrainingProvider(IKaggleClient client)
         {
@@ -76,70 +82,7 @@ namespace Insight.Training.Providers
                     },
                     cancellationToken);
 
-                var terminal = await PollUntilTerminalAsync(submitted.KernelId, options, observer, cancellationToken);
-                if (terminal.State == TrainingProviderJobState.Stopped)
-                {
-                    return new TrainingProviderJobResult
-                    {
-                        JobId = request.JobId,
-                        State = TrainingProviderJobState.Stopped,
-                        FailureReason = "Kaggle training job was canceled.",
-                        Metadata = BuildMetadata(submitted, terminal.StatusMessage, options.OutputDirectory)
-                    };
-                }
-
-                if (terminal.State == TrainingProviderJobState.Failed)
-                {
-                    return Failed(
-                        request.JobId,
-                        string.IsNullOrWhiteSpace(terminal.StatusMessage)
-                            ? "Kaggle training failed."
-                            : terminal.StatusMessage,
-                        BuildMetadata(submitted, terminal.StatusMessage, options.OutputDirectory));
-                }
-
-                observer.Log("Downloading Kaggle output artifacts...", "info");
-                var outputDirectory = await _client.DownloadOutputAsync(
-                    new KaggleOutputDownloadRequest
-                    {
-                        KernelId = submitted.KernelId,
-                        OutputDirectory = options.OutputDirectory,
-                        OnLog = observer.Log
-                    },
-                    cancellationToken);
-
-                var artifacts = DiscoverArtifacts(outputDirectory);
-                foreach (var artifact in artifacts)
-                {
-                    observer.Artifact(artifact);
-                }
-
-                var bestPt = artifacts.FirstOrDefault(x => x.Format == "pt")?.Path ?? "";
-                var onnx = artifacts.FirstOrDefault(x => x.Format == "onnx")?.Path ?? "";
-                if (string.IsNullOrWhiteSpace(bestPt))
-                {
-                    return Failed(
-                        request.JobId,
-                        "Kaggle output download completed, but best.pt was not found.",
-                        BuildMetadata(submitted, terminal.StatusMessage, outputDirectory));
-                }
-
-                if (string.IsNullOrWhiteSpace(onnx))
-                {
-                    return Failed(
-                        request.JobId,
-                        "Kaggle output download completed, but an ONNX artifact was not found.",
-                        BuildMetadata(submitted, terminal.StatusMessage, outputDirectory));
-                }
-
-                return new TrainingProviderJobResult
-                {
-                    JobId = request.JobId,
-                    State = TrainingProviderJobState.Completed,
-                    ArtifactPath = bestPt,
-                    Artifacts = artifacts,
-                    Metadata = BuildMetadata(submitted, terminal.StatusMessage, outputDirectory)
-                };
+                return await MonitorAndDownloadAsync(request.JobId, submitted, options, observer, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -156,6 +99,121 @@ namespace Insight.Training.Providers
             }
         }
 
+        public async Task<TrainingProviderJobResult> RecoverAsync(
+            TrainingProviderJobRequest request,
+            ITrainingJobObserver observer,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var options = KaggleProviderOptions.From(request);
+                if (string.IsNullOrWhiteSpace(options.KernelId))
+                {
+                    return Failed(request.JobId, "Cannot recover Kaggle job because kernelId is missing.");
+                }
+
+                observer.Log($"Recovering Kaggle job state: {options.KernelId}", "info");
+                var submitted = new KaggleTrainingSubmissionResult
+                {
+                    JobId = request.JobId,
+                    DatasetId = options.DatasetId,
+                    KernelId = options.KernelId,
+                    KernelUrl = $"https://www.kaggle.com/code/{options.KernelId}",
+                    JobRoot = options.JobRoot,
+                    DatasetDirectory = options.DatasetDirectory,
+                    KernelDirectory = options.KernelDirectory,
+                    Submitted = true,
+                    Message = "Recovered from persisted Insight job state."
+                };
+
+                return await MonitorAndDownloadAsync(request.JobId, submitted, options, observer, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return new TrainingProviderJobResult
+                {
+                    JobId = request.JobId,
+                    State = TrainingProviderJobState.Stopped,
+                    FailureReason = "Kaggle recovery was canceled."
+                };
+            }
+            catch (Exception ex)
+            {
+                return Failed(request.JobId, ex.Message);
+            }
+        }
+
+        private async Task<TrainingProviderJobResult> MonitorAndDownloadAsync(
+            string jobId,
+            KaggleTrainingSubmissionResult submitted,
+            KaggleProviderOptions options,
+            ITrainingJobObserver observer,
+            CancellationToken cancellationToken)
+        {
+            var terminal = await PollUntilTerminalAsync(submitted.KernelId, options, observer, cancellationToken);
+            if (terminal.State == TrainingProviderJobState.Stopped)
+            {
+                return new TrainingProviderJobResult
+                {
+                    JobId = jobId,
+                    State = TrainingProviderJobState.Stopped,
+                    FailureReason = "Kaggle training job was canceled.",
+                    Metadata = BuildMetadata(submitted, terminal.StatusMessage, options.OutputDirectory)
+                };
+            }
+
+            if (terminal.State == TrainingProviderJobState.Failed)
+            {
+                return Failed(
+                    jobId,
+                    string.IsNullOrWhiteSpace(terminal.StatusMessage)
+                        ? "Kaggle training failed."
+                        : terminal.StatusMessage,
+                    BuildMetadata(submitted, terminal.StatusMessage, options.OutputDirectory));
+            }
+
+            observer.Log("Downloading Kaggle output artifacts...", "info");
+            var outputDirectory = await _client.DownloadOutputAsync(
+                new KaggleOutputDownloadRequest
+                {
+                    KernelId = submitted.KernelId,
+                    OutputDirectory = options.OutputDirectory,
+                    OnLog = observer.Log
+                },
+                cancellationToken);
+
+            var artifacts = DiscoverArtifacts(outputDirectory);
+            var manifestPath = WriteArtifactManifest(jobId, submitted.KernelId, outputDirectory, artifacts);
+            artifacts.Add(new TrainingArtifact { Path = manifestPath, Format = "manifest" });
+
+            foreach (var artifact in artifacts)
+            {
+                observer.Artifact(artifact);
+            }
+
+            var validation = ValidateArtifacts(artifacts, manifestPath);
+            var metadata = BuildMetadata(submitted, terminal.StatusMessage, outputDirectory);
+            metadata["artifactManifestPath"] = manifestPath;
+            foreach (var pair in validation.Checksums)
+            {
+                metadata[pair.Key] = pair.Value;
+            }
+
+            if (!validation.Success)
+            {
+                return Failed(jobId, validation.Message, metadata);
+            }
+
+            return new TrainingProviderJobResult
+            {
+                JobId = jobId,
+                State = TrainingProviderJobState.Completed,
+                ArtifactPath = validation.BestPtPath,
+                Artifacts = artifacts,
+                Metadata = metadata
+            };
+        }
+
         private async Task<PollResult> PollUntilTerminalAsync(
             string kernelId,
             KaggleProviderOptions options,
@@ -170,12 +228,12 @@ namespace Insight.Training.Providers
                 var status = await _client.GetTrainingStatusAsync(kernelId, cancellationToken);
                 observer.Log($"Kaggle kernel status: {status.State} {status.Message}".Trim(), "info");
 
-                if (IsCompleted(status.State))
+                if (IsCompleted(status))
                 {
                     return new PollResult(TrainingProviderJobState.Completed, status.Message);
                 }
 
-                if (IsFailed(status.State))
+                if (IsFailed(status))
                 {
                     return new PollResult(TrainingProviderJobState.Failed, status.Message);
                 }
@@ -189,6 +247,98 @@ namespace Insight.Training.Providers
             return new PollResult(
                 TrainingProviderJobState.Failed,
                 $"Kaggle training did not finish before timeout ({options.PollTimeout.TotalMinutes:0.#} minutes).");
+        }
+
+        private static string WriteArtifactManifest(
+            string jobId,
+            string kernelId,
+            string outputDirectory,
+            List<TrainingArtifact> artifacts)
+        {
+            var manifest = new KaggleArtifactManifest
+            {
+                JobId = jobId,
+                KernelId = kernelId,
+                OutputDirectory = outputDirectory,
+                CreatedAtUtc = DateTime.UtcNow,
+                Artifacts = artifacts
+                    .Where(x => !string.IsNullOrWhiteSpace(x.Path) && File.Exists(x.Path))
+                    .Select(x => new KaggleArtifactManifestItem
+                    {
+                        Path = x.Path,
+                        RelativePath = Path.GetRelativePath(outputDirectory, x.Path),
+                        Format = x.Format,
+                        Length = new FileInfo(x.Path).Length,
+                        Sha256 = ComputeSha256(x.Path)
+                    })
+                    .OrderBy(x => x.RelativePath, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            };
+
+            var manifestPath = Path.Combine(outputDirectory, "insight-kaggle-artifacts.json");
+            File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, JsonOptions));
+            return manifestPath;
+        }
+
+        private static ArtifactValidationResult ValidateArtifacts(
+            IReadOnlyList<TrainingArtifact> artifacts,
+            string manifestPath)
+        {
+            var bestPt = artifacts.FirstOrDefault(x => x.Format == "pt")?.Path ?? "";
+            var onnx = artifacts.FirstOrDefault(x => x.Format == "onnx")?.Path ?? "";
+            var report = artifacts.FirstOrDefault(x => x.Format is "metrics" or "report" or "report-image")?.Path ?? "";
+            if (string.IsNullOrWhiteSpace(bestPt) || !File.Exists(bestPt))
+            {
+                return ArtifactValidationResult.Fail("Kaggle output download completed, but best.pt was not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(onnx) || !File.Exists(onnx))
+            {
+                return ArtifactValidationResult.Fail("Kaggle output download completed, but an ONNX artifact was not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(report) || !File.Exists(report))
+            {
+                return ArtifactValidationResult.Fail("Kaggle output download completed, but no metrics or report artifact was found.");
+            }
+
+            var manifestJson = File.ReadAllText(manifestPath);
+            var manifest = JsonSerializer.Deserialize<KaggleArtifactManifest>(manifestJson, JsonOptions);
+            if (manifest == null || manifest.Artifacts.Count == 0)
+            {
+                return ArtifactValidationResult.Fail("Kaggle artifact manifest is empty or invalid.");
+            }
+
+            foreach (var item in manifest.Artifacts)
+            {
+                if (!File.Exists(item.Path))
+                {
+                    return ArtifactValidationResult.Fail($"Kaggle artifact manifest references a missing file: {item.RelativePath}");
+                }
+
+                var info = new FileInfo(item.Path);
+                if (info.Length != item.Length)
+                {
+                    return ArtifactValidationResult.Fail($"Kaggle artifact length mismatch: {item.RelativePath}");
+                }
+
+                var sha = ComputeSha256(item.Path);
+                if (!sha.Equals(item.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ArtifactValidationResult.Fail($"Kaggle artifact checksum mismatch: {item.RelativePath}");
+                }
+            }
+
+            return ArtifactValidationResult.Ok(
+                bestPt,
+                onnx,
+                report,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["bestPtSha256"] = ComputeSha256(bestPt),
+                    ["onnxSha256"] = ComputeSha256(onnx),
+                    ["reportSha256"] = ComputeSha256(report)
+                });
         }
 
         private static List<TrainingArtifact> DiscoverArtifacts(string outputDirectory)
@@ -220,19 +370,28 @@ namespace Insight.Training.Providers
             }
         }
 
-        private static bool IsCompleted(string state)
+        private static bool IsCompleted(KaggleTrainingJobStatus status)
         {
-            return state.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
-                state.Equals("Complete", StringComparison.OrdinalIgnoreCase) ||
-                state.Equals("Succeeded", StringComparison.OrdinalIgnoreCase);
+            return status.KernelState == KaggleKernelState.Completed ||
+                status.State.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("Complete", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("Succeeded", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsFailed(string state)
+        private static bool IsFailed(KaggleTrainingJobStatus status)
         {
-            return state.Equals("Failed", StringComparison.OrdinalIgnoreCase) ||
-                state.Equals("Error", StringComparison.OrdinalIgnoreCase) ||
-                state.Equals("Canceled", StringComparison.OrdinalIgnoreCase) ||
-                state.Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
+            return status.KernelState is KaggleKernelState.Failed or KaggleKernelState.Canceled or KaggleKernelState.TimedOut ||
+                status.State.Equals("Failed", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("Error", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("TimedOut", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("Canceled", StringComparison.OrdinalIgnoreCase) ||
+                status.State.Equals("Cancelled", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using var stream = File.OpenRead(path);
+            return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
         }
 
         private static TrainingProviderJobResult Failed(
@@ -270,13 +429,52 @@ namespace Insight.Training.Providers
 
         private readonly record struct PollResult(TrainingProviderJobState State, string StatusMessage);
 
+        private sealed class ArtifactValidationResult
+        {
+            public bool Success { get; init; }
+            public string Message { get; init; } = "";
+            public string BestPtPath { get; init; } = "";
+            public string OnnxPath { get; init; } = "";
+            public string ReportPath { get; init; } = "";
+            public Dictionary<string, string> Checksums { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+            public static ArtifactValidationResult Ok(
+                string bestPtPath,
+                string onnxPath,
+                string reportPath,
+                Dictionary<string, string> checksums)
+            {
+                return new ArtifactValidationResult
+                {
+                    Success = true,
+                    BestPtPath = bestPtPath,
+                    OnnxPath = onnxPath,
+                    ReportPath = reportPath,
+                    Checksums = checksums
+                };
+            }
+
+            public static ArtifactValidationResult Fail(string message)
+            {
+                return new ArtifactValidationResult
+                {
+                    Success = false,
+                    Message = message
+                };
+            }
+        }
+
         private sealed class KaggleProviderOptions
         {
             public string ProjectName { get; init; } = "Insight";
             public string KaggleUsername { get; init; } = "";
             public string DatasetSlug { get; init; } = "";
             public string KernelSlug { get; init; } = "";
+            public string DatasetId { get; init; } = "";
+            public string KernelId { get; init; } = "";
+            public string JobRoot { get; init; } = "";
             public string DatasetDirectory { get; init; } = "";
+            public string KernelDirectory { get; init; } = "";
             public string OutputDirectory { get; init; } = "";
             public string YoloVersion { get; init; } = "yolov8";
             public TimeSpan PollInterval { get; init; } = TimeSpan.FromSeconds(30);
@@ -309,7 +507,11 @@ namespace Insight.Training.Providers
                     KaggleUsername = Require(options, "kaggleUsername"),
                     DatasetSlug = Require(options, "datasetSlug"),
                     KernelSlug = Require(options, "kernelSlug"),
+                    DatasetId = Get(options, "datasetId", ""),
+                    KernelId = Get(options, "kernelId", ""),
+                    JobRoot = Get(options, "jobRoot", ""),
                     DatasetDirectory = datasetDirectory,
+                    KernelDirectory = Get(options, "kernelDirectory", ""),
                     OutputDirectory = outputDirectory,
                     YoloVersion = Get(options, "yoloVersion", "yolov8"),
                     PollInterval = TimeSpan.FromSeconds(GetDouble(options, "pollIntervalSeconds", 30)),
